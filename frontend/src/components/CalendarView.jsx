@@ -2,22 +2,37 @@ import React, { useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
-const CalendarView = () => {
+const CalendarView = ({ reminders = [] }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Example: Dates with medicines taken or missed
-  const medicineHistory = {
-    "2025-10-01": "taken",
-    "2025-10-02": "missed",
-    "2025-10-03": "upcoming",
-  };
+ const [calendarData, setCalendarData] = useState({});
+
+  // Transform reminders into a date-based object for calendar
+  useEffect(() => {
+    const data = {};
+    reminders.forEach((r) => {
+      const dateKey = new Date(r.time).toISOString().split("T")[0];
+      // Prioritize status: Missed > Upcoming > Taken
+      if (!data[dateKey]) {
+        data[dateKey] = r.status;
+      } else if (r.status === "Missed") {
+        data[dateKey] = "missed";
+      } else if (r.status === "Pending" && data[dateKey] !== "missed") {
+        data[dateKey] = "upcoming";
+      } else if (r.status === "Taken" && !["missed", "upcoming"].includes(data[dateKey])) {
+        data[dateKey] = "taken";
+      }
+    });
+    setCalendarData(data);
+  }, [reminders]);
 
   const tileClassName = ({ date, view }) => {
     if (view === "month") {
       const key = date.toISOString().split("T")[0];
-      if (medicineHistory[key] === "taken") return "bg-green-200 rounded-full";
-      if (medicineHistory[key] === "missed") return "bg-red-200 rounded-full";
-      if (medicineHistory[key] === "upcoming") return "bg-blue-200 rounded-full";
+      if (calendarData[key] === "taken") return "bg-green-200 rounded-full";
+      if (calendarData[key] === "missed") return "bg-red-200 rounded-full";
+      if (calendarData[key] === "upcoming") return "bg-blue-200 rounded-full";
     }
     return "";
   };

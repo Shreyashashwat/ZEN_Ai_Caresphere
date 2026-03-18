@@ -5,7 +5,7 @@ import { Medicine } from "../model/medicine.model.js";
 
 
 const getMedicines = asyncHandler(async (req, res) => {
-  const userId = req.userId;
+  const userId = req.user;
   if (!userId) throw new ApiError(400, "User ID missing");
 
   const medicines = await Medicine.find({ userId });
@@ -14,7 +14,7 @@ const getMedicines = asyncHandler(async (req, res) => {
 });
 
 const addMedicine = asyncHandler(async (req, res) => {
-  const userId = req.userId; 
+  const userId = req.user; 
   if (!userId) throw new ApiError(400, "Invalid user");
 
   const { medicineName, dosage, frequency, time, startDate, endDate, repeat } = req.body;
@@ -36,7 +36,7 @@ const addMedicine = asyncHandler(async (req, res) => {
 
 const updateMedicine = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const userId = req.userId;
+  const userId = req.user;
   if (!userId) throw new ApiError(400, "User ID missing");
 
   const updateData = req.body; 

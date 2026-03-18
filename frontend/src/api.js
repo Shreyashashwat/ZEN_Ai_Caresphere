@@ -33,9 +33,10 @@ export const updateReminderStatus = (reminderId, data) =>
 export const deleteReminder = (reminderId) =>
   API.delete(`/reminder/${reminderId}`);
 export const markasTaken = (reminderId) =>
-  API.put(`/reminder/taken/${reminderId}`);
+  API.patch(`/reminder/taken/${reminderId}`);
 export const markasMissed = (reminderId) =>
-  API.put(`/reminder/missed/${reminderId}`);
+  API.patch(`/reminder/missed/${reminderId}`);
 export const fetchHistory = () => API.get(`/users/history`);
+export const getDashboardStats=()=>API.get("/users/dashboard");
 
 export default API;

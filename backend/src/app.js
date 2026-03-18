@@ -26,7 +26,7 @@ app.get("/test", (req, res) => {
 app.use('/api/v1/users',userRouters)
 app.use('/api/v1/medicine',medicineRoutes)
 app.use("/api/v1/reminder",reminderRoutes)
-app.use("api/v1/chatbot",chatbotRoute);
+app.use("/api/v1/chatbot",chatbotRoute);
 
 
 export default app

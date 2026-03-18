@@ -3,7 +3,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Medicine } from "../model/medicine.model.js";
 
 const getHistory = asyncHandler(async (req, res) => {
-  const userId = req.userId;
+  const userId = req.user;
   if (!userId)
     return res.status(400).json(new ApiResponse(400, null, "User is missing"));
 

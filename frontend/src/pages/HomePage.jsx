@@ -13,12 +13,7 @@ const HomePage = () => {
     age: 0,
     gender: "",
   });
-  useEffect(() => {
-    fetch("http://localhost:8000/test",)
-      .then((res) => res.text())
-      .then(console.log)
-      .catch(console.error);
-    }, []);
+  
   const clearForms = () => {
     setLoginData({ email: "", password: "" });
     setRegisterData({ username: "", email: "", password: "", age: 0, gender: "" });
@@ -40,8 +35,12 @@ const HomePage = () => {
     try {
       const res = await loginUser(loginData);
       console.log("Login success:", res.data);
-      localStorage.setItem("user", JSON.stringify(res.data));
+      const { user, token } = res.data.data;
 
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ _id: user._id, username: user.username,token })
+    );
       alert("Login successful!");
 
       navigate("/patient");

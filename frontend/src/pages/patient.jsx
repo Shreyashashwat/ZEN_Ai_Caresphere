@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import MedicineList from "../components/MedicineList";
 import MedicineForm from "../components/MedicineForm";
 import HistoryTable from "../components/HistoryTable";
@@ -33,10 +34,11 @@ const Patient = () => {
   // Fetch history
   const fetchHistoryData = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem("users"));
-      const { data } = await fetchHistory(user._id);
+      
+      const res = await fetchHistory();
       // Sort by time
-      const sortedHistory = data.sort((a, b) => new Date(a.time) - new Date(b.time));
+     const historyData = res.data.data || [];
+    const sortedHistory = historyData.sort((a, b) => new Date(a.time) - new Date(b.time));
       setHistory(sortedHistory);
     } catch (err) {
       console.error("Failed to fetch history:", err);
@@ -46,11 +48,12 @@ const Patient = () => {
   // Fetch reminders
   const fetchReminders = async () => {
     try {
-      const { data } = await getReminders();
-      setReminders(data);
-      if (data.length > 0) {
-        // Assuming reminders are sorted by time
-        setNextReminder(data[0]);
+      const res = await getReminders(); 
+    const remindersArray = Array.isArray(res.data.reminders) ? res.data.reminders : [];
+    setReminders(remindersArray);
+
+    if (remindersArray.length > 0) {
+      setNextReminder(remindersArray[0]);
       }
     } catch (err) {
       console.error("Failed to fetch reminders:", err);
@@ -71,7 +74,7 @@ const Patient = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    window.location.reload(); // redirect to login
+   navigate("/"); 
   };
 
   return (

@@ -1,143 +1,118 @@
-import React, { useState } from "react";
-import {
-  getMedicines,
-  updateMedicine,
-  deleteMedicine,
-} from "../api";
+import React from "react";
+import { updateMedicine, deleteMedicine } from "../api";
 
-
-
-const MedicineList = () => {
-   const [medicines, setMedicines] = useState([]);
-  const [loading, setLoading] = useState(true);
-  // Fetch all medicines from backend
-  const fetchMedicines = async () => {
-    try {
-      setLoading(true);
-      const { data } = await getMedicines();
-      setMedicines(data?.medicines || data); // depends on backend response
-    } catch (error) {
-      console.error("Error fetching medicines:", error);
-      alert("Failed to fetch medicines. Please check your server connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Mark as Taken
-  const markTaken = async (id) => {
-    try {
-      await updateMedicine(id, { status: "Taken" });
-      setMedicines((prev) =>
-        prev.map((m) => (m._id === id ? { ...m, status: "Taken" } : m))
-      );
-    } catch (error) {
-      console.error("Error updating medicine status:", error);
-      alert("Failed to update status.");
-    }
-  };
-
-  // Mark as Missed
-  const markMissed = async (id) => {
-    try {
-      await updateMedicine(id, { status: "Missed" });
-      setMedicines((prev) =>
-        prev.map((m) => (m._id === id ? { ...m, status: "Missed" } : m))
-      );
-    } catch (error) {
-      console.error("Error updating medicine status:", error);
-      alert("Failed to update status.");
-    }
-  };
-
-  // Delete medicine
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
-    try {
-      await deleteMedicine(id);
-      setMedicines((prev) => prev.filter((m) => m._id !== id));
-    } catch (error) {
-      console.error("Error deleting medicine:", error);
-      alert("Failed to delete medicine.");
-    }
-  };
-
-  useEffect(() => {
-    fetchMedicines();
-  }, []);
-
-  if (loading) return <p className="text-center text-gray-500 mt-10">Loading medicines...</p>;
-
-
-  
-
+const MedicineList = ({ medicines, onUpdate }) => {
   const statusColors = {
     Taken: "bg-green-100 text-green-800",
     Missed: "bg-red-100 text-red-800",
     Pending: "bg-yellow-100 text-yellow-800",
   };
 
+  
+  const getNextMedicineId = () => {
+    const now = new Date();
+    let next = null;
+    medicines.forEach((m) => {
+      if (Array.isArray(m.time)) {
+        m.time.forEach((t) => {
+          const medicineTime = new Date(t);
+          if (medicineTime > now && (!next || medicineTime < new Date(next.time))) {
+            next = { ...m, time: t };
+          }
+        });
+      } else {
+        const medicineTime = new Date(m.time);
+        if (medicineTime > now && (!next || medicineTime < new Date(next.time))) {
+          next = m;
+        }
+      }
+    });
+    return next?._id;
+  };
+
+  const nextMedicineId = getNextMedicineId();
+
+  const updateStatus = async (id, status) => {
+    try {
+      await updateMedicine(id, { status });
+      onUpdate(); // refresh parent
+    } catch (err) {
+      console.error("Error updating status:", err);
+      alert("Failed to update medicine status.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+    try {
+      await deleteMedicine(id);
+      onUpdate(); // refresh parent
+    } catch (err) {
+      console.error("Error deleting medicine:", err);
+      alert("Failed to delete medicine.");
+    }
+  };
+
+  if (!medicines || medicines.length === 0)
+    return <p className="text-gray-500 text-center mt-10">No medicines added yet.</p>;
+
   return (
     <div className="max-w-4xl mx-auto mt-6 space-y-4">
-       <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">
+      <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">
         💊 Your Medicines
       </h2>
-     
 
-      {medicines.length === 0 ? (
-        <p className="text-gray-500 text-center">No medicines added yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {medicines.map((m) => (
-            <div
-              key={m._id}
-              className="flex flex-col sm:flex-row items-center justify-between p-4 bg-white rounded-2xl shadow hover:shadow-lg transition duration-300 border border-gray-100"
+      {medicines.map((m) => (
+        <div
+          key={m._id}
+          className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border ${
+            m._id === nextMedicineId
+              ? "bg-indigo-50 border-indigo-300 shadow-lg"
+              : "bg-white border-gray-100"
+          } hover:shadow-xl transition duration-200`}
+        >
+          <div className="flex-1 text-center sm:text-left space-y-1">
+            <h3 className="text-lg font-semibold text-indigo-600">
+              {m.medicineName || m.name}
+            </h3>
+            <p className="text-gray-600">{m.dosage}</p>
+            <p className="text-gray-500 text-sm">
+              {Array.isArray(m.time) ? m.time.join(", ") : m.time} • {m.frequency}
+            </p>
+          </div>
+
+          <div className="mt-3 sm:mt-0">
+            <span
+              className={`px-3 py-1 rounded-full font-semibold ${
+                statusColors[m.status] || "bg-gray-100 text-gray-700"
+              }`}
             >
-              {/* Medicine Info */}
-              <div className="flex-1 text-center sm:text-left space-y-1">
-                <h3 className="text-lg font-semibold text-indigo-600">{m.name}</h3>
-                <p className="text-gray-600">{m.dosage}</p>
-               <p className="text-gray-500 text-sm">
-                  {m.time} • {m.frequency}
-                </p>
-              </div>
+              {m.status || "Pending"}
+            </span>
+          </div>
 
-              {/* Status Badge */}
-              <div className="mt-3 sm:mt-0">
-                <span
-                  className={`px-3 py-1 rounded-full font-semibold ${
-                    statusColors[m.status] || "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {m.status}
-                </span>
-              </div>
-
-              {/* Actions */}
-              <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">
-                <button
-                  onClick={() => markTaken(m._id)}
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full transition duration-200"
-                >
-                  Taken
-                </button>
-                <button
-                  onClick={() => markMissed(m._id)}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full transition duration-200"
-                >
-                  Missed
-                </button>
-                <button
-                  onClick={() => handleDelete(m._id)}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-full transition duration-200"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+          <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">
+            <button
+              onClick={() => updateStatus(m._id, "Taken")}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full transition duration-200"
+            >
+              Taken
+            </button>
+            <button
+              onClick={() => updateStatus(m._id, "Missed")}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full transition duration-200"
+            >
+              Missed
+            </button>
+            <button
+              onClick={() => handleDelete(m._id)}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-full transition duration-200"
+            >
+              Delete
+            </button>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 };

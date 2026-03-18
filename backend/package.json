@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
-  "type": "module",
+
   "scripts": {
     "dev":"nodemon src/index.js"
   },
@@ -13,8 +13,17 @@
     "@huggingface/inference": "^4.11.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+
+    "express": "^5.1.0",
     "dotenv": "^17.2.3",
     "express-async-handler": "^1.2.0",
+     "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.1",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.9"
+  },
+  "devDependencies": {
     "nodemon": "^3.1.10"
   }
 }
