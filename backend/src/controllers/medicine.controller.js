@@ -10,7 +10,7 @@ const getMedicines = asyncHandler(async (req, res) => {
 
   const medicines = await Medicine.find({ userId });
 
-  return res.status(200).json(new ApiResponse(200, { medicines }, "Medicines fetched successfully"));
+ return res.status(200).json(new ApiResponse(200, medicines , "Medicines fetched successfully"));
 });
 
 const addMedicine = asyncHandler(async (req, res) => {

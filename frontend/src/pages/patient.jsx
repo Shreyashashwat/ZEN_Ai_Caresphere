@@ -24,8 +24,9 @@ const Patient = () => {
   // Fetch medicines from backend
   const fetchMedicines = async () => {
     try {
-      const { data } = await getMedicines();
-      setMedicines(data.medicines || []);
+      const res = await getMedicines();       // res.data is ApiResponse
+    const medicinesArray = Array.isArray(res.data.data) ? res.data.data : [];
+    setMedicines(medicinesArray);
     } catch (err) {
       console.error("Failed to fetch medicines:", err);
     }

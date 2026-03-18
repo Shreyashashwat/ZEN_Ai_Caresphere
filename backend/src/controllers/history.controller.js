@@ -6,10 +6,14 @@ const getHistory = asyncHandler(async (req, res) => {
   const userId = req.user;
   if (!userId)
     return res.status(400).json(new ApiResponse(400, null, "User is missing"));
+   const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
   const medicines = await Medicine.find({ userId }).populate("statusHistory");
   const history = medicines.flatMap((med) =>
-    med.statusHistory.map((status) => ({
+    med.statusHistory
+      .filter((status) => new Date(status.time) >= twoDaysAgo) // only past 2 days
+      .map((status) => ({
       medicineName: med.medicineName,
       dosage: med.dosage,
       frequency: med.frequency,
@@ -24,7 +28,7 @@ const getHistory = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, history, "Medicine history fetched successfully"));
+   .json(new ApiResponse(200, history, "Medicine history fetched successfully (last 2 days)"));
 });
 
 export { getHistory };

@@ -4,16 +4,16 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Reminder } from "../model/reminderstatus.js";
 import { Medicine } from "../model/medicine.model.js";
 const addReminder = asyncHandler(async (req, res) => {
-  const { medicationId, time, status } = req.body;
+  const { medicineId, time, status } = req.body;
   const userId = req.userId;
 
-  if (!medicationId || !time) throw new ApiError(400, "Medication ID and time are required");
+  if (!medicineId || !time) throw new ApiError(400, "Medicine ID and time are required");
 
-  const medicine = await Medicine.findOne({ _id: medicationId, userId });
+  const medicine = await Medicine.findOne({ _id: medicineId, userId });
   if (!medicine) throw new ApiError(404, "Medicine not found or unauthorized");
 
   const reminder = await Reminder.create({
-    medicationId,
+    medicineId,
     userId,
     time: new Date(time),
     status: status || "pending",
@@ -31,7 +31,7 @@ const addReminder = asyncHandler(async (req, res) => {
 const updateReminderStatus = asyncHandler(async (req, res) => {
   const { id } = req.params; 
   const { status } = req.body;
-  const userId = req.userId;
+  const userId = req.user;
 
   if (!status || !["pending", "taken", "missed"].includes(status))
     throw new ApiError(400, "Invalid status");
@@ -49,9 +49,9 @@ const updateReminderStatus = asyncHandler(async (req, res) => {
 
 
 const getReminders = asyncHandler(async (req, res) => {
-  const userId = req.userId;
+  const userId = req.user;
 const reminders = await Reminder.find({ userId })
-    .populate("medicationId", ["medicineName", "dosage", "frequency"])
+    .populate("medicineId", ["medicineName", "dosage", "frequency"])
     .sort({ time: 1 });
 
   res.status(200).json(new ApiResponse(200, reminders, "Reminders fetched successfully"));
@@ -69,7 +69,7 @@ const deleteReminder = asyncHandler(async (req, res) => {
 
  
   await Medicine.updateOne(
-    { _id: reminder.medicationId },
+    { _id: reminder.medicineId },
     { $pull: { statusHistory: reminder._id } }
   );
 
@@ -84,7 +84,7 @@ const markasTaken=asyncHandler(async(req,res)=>{
   const reminder = await Reminder.findById(reminderId);
   if (!reminder) throw new ApiError(404, "Reminder not found");
  
-  const medicine = await Medicine.findById(reminder.medicationId);
+  const medicine = await Medicine.findById(reminder.medicineId);
   if (!medicine || medicine.userId.toString() !== userId)
     throw new ApiError(403, "Not authorized");
 reminder.status="taken";
@@ -106,7 +106,7 @@ const markasMissed=asyncHandler(async(req,res)=>{
   const reminder = await Reminder.findById(reminderId);
   if (!reminder) throw new ApiError(404, "Reminder not found");
  
-  const medicine = await Medicine.findById(reminder.medicationId);
+  const medicine = await Medicine.findById(reminder.medicineId);
   if (!medicine || medicine.userId.toString() !== userId)
     throw new ApiError(403, "Not authorized");
 reminder.status="missed";

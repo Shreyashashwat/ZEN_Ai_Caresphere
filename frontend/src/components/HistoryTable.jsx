@@ -48,11 +48,11 @@ const HistoryTable = () => {
             <tbody>
               {history.map((h) => (
                 <tr
-                  key={h._id || `${h.date}-${h.medicine}`}
+                   key={ `${h.time}-${h.medicine}`}
                   className="hover:bg-gray-50 transition"
                 >
                   <td className="py-2 px-4 border-b">
-                    {new Date(h.date).toLocaleDateString()}
+                   {new Date(h.time).toLocaleDateString()}
                   </td>
                   <td className="py-2 px-4 border-b">{h.medicineName}</td>
                   <td className="py-2 px-4 border-b">{h.dosage}</td>
