@@ -2,9 +2,10 @@ import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
 import userRouters from "./routes/user.routes.jsx"
-import medicineRoutes from"./src/routes/medicine.routes.js"
-import reminderRoutes from "./src/routes/reminder.routes.js"
+import medicineRoutes from"./routes/medicine.routes.js"
+import reminderRoutes from "./routes/reminder.routes.js"
 import chatbotRoute from "./routes/chatbot.routes.js"
+import mlRoutes from "./routes/ml.routes.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -27,6 +28,7 @@ app.use('/api/v1/users',userRouters)
 app.use('/api/v1/medicine',medicineRoutes)
 app.use("/api/v1/reminder",reminderRoutes)
 app.use("/api/v1/chatbot",chatbotRoute);
+app.use("/api", mlRoutes);
 
 
 export default app
