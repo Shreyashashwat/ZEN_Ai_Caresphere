@@ -2,12 +2,13 @@ import axios from "axios";
 
 const API = axios.create({
  baseURL: "http://localhost:8000/api/v1", 
+ withCredentials: true,
 
 });
 API.interceptors.request.use((req) => {
   const user = localStorage.getItem("user");
   if (user) {
-    req.headers.Authorization = `Bearer ${JSON.parse(user).token}`;
+     req.headers.Authorization = `Bearer ${JSON.parse(user).data.token}`;
   }
   return req;
 });
@@ -29,7 +30,7 @@ export const updateReminderStatus=(reminderId,data)=>API.put(`/reminder/${remind
 export const deleteReminder=(reminderId)=>API.delete(`/reminder/${reminderId}`);
 export const markasTaken=(reminderId)=>API.put(`/reminder/taken/${reminderId}`);
 export const markasMissed=(reminderId)=>API.put(`/reminder/missed/${reminderId}`);
-export const fetchHistory=()=>API.get(`/reminder/history`);
+export const fetchHistory=()=>API.get(`/users/history`);
 
 
 export default API;

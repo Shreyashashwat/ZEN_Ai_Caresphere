@@ -44,13 +44,13 @@ const MedicineForm = ({ onSuccess }) => {
     try {
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user || !user._id) {
-        alert("❌ User not found. Please log in again.");
+        alert(" User not found. Please log in again.");
         return;
       }
 
       const data = { ...formData, userId: user._id };
       await addMedicine(data);
-      alert("✅ Medicine added successfully!");
+      alert("Medicine added successfully!");
 
       // reset form
       setFormData({
@@ -65,7 +65,7 @@ const MedicineForm = ({ onSuccess }) => {
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error(err);
-      alert("❌ Failed to add medicine");
+      alert("Failed to add medicine");
     } finally {
       setLoading(false);
     }

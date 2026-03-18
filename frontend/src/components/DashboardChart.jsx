@@ -1,60 +1,54 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  ArcElement,
   Tooltip,
   Legend,
 } from "chart.js";
-import { Line } from "react-chartjs-2";
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(ArcElement, Tooltip, Legend);
 
-function DashboardChart() {
+const DashboardChart = () => {
+ 
+  const [stats, setStats] = useState({ taken: 12, missed: 5 });
+
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStats({
+        taken: Math.floor(Math.random() * 20),
+        missed: Math.floor(Math.random() * 10),
+      });
+    }, 5000); 
+    return () => clearInterval(timer);
+  }, []);
+
   const data = {
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+    labels: ["Taken", "Missed"],
     datasets: [
       {
-        label: "Users",
-        data: [120, 190, 300, 500, 200, 300],
-        borderColor: "rgb(75, 192, 192)",
-        backgroundColor: "rgba(75, 192, 192, 0.2)",
-        tension: 0.4, 
+        label: "Medicine Status",
+        data: [stats.taken, stats.missed],
+        backgroundColor: ["#4ade80", "#f87171"], 
+        borderColor: ["#22c55e", "#ef4444"],
+        borderWidth: 1,
       },
     ],
   };
 
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: "top",
-      },
-      title: {
-        display: true,
-        text: "Users Growth",
-      },
-    },
-  };
-
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">Dashboard Chart</h2>
-      <Line data={data} options={options} />
+    <div className="w-full max-w-sm mx-auto p-6 bg-white rounded-3xl shadow-lg">
+      <h2 className="text-xl font-semibold text-center text-indigo-600 mb-4">
+        Medicine Status Overview
+      </h2>
+      <Doughnut data={data} />
+      <div className="flex justify-around mt-4 text-gray-700 font-medium">
+        <span>✅ Taken: {stats.taken}</span>
+        <span>❌ Missed: {stats.missed}</span>
+      </div>
     </div>
   );
-}
+};
 
 export default DashboardChart;

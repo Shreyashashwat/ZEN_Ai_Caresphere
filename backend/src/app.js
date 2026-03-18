@@ -4,6 +4,10 @@ import cookieParser from "cookie-parser"
 import userRouters from "./routes/user.routes.jsx"
 import medicineRoutes from"./src/routes/medicine.routes.js"
 import reminderRoutes from "./src/routes/reminder.routes.js"
+import chatbotRoute from "./routes/chatbot.routes.js"
+
+import dotenv from "dotenv";
+dotenv.config();
 
 
 const app=express()
@@ -22,5 +26,7 @@ app.get("/test", (req, res) => {
 app.use('/api/v1/users',userRouters)
 app.use('/api/v1/medicine',medicineRoutes)
 app.use("/api/v1/reminder",reminderRoutes)
+app.use("api/v1/chatbot",chatbotRoute);
+
 
 export default app

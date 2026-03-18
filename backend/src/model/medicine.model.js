@@ -11,7 +11,7 @@ const medicineSchema = new mongoose.Schema({
   endDate: { type: Date },
   repeat: { type: String, default: "daily" },
   nextReminder: { type: Date },
-  statusHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: "ReminderStatus" }],
+  statusHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: "Reminder" }],
   createdAt: { type: Date, default: Date.now },
   takenCount: { type: Number, default: 0 },
 missedCount: { type: Number, default: 0 },

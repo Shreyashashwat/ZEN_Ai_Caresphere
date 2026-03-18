@@ -1,15 +1,75 @@
 import React, { useState } from "react";
+import {
+  getMedicines,
+  updateMedicine,
+  deleteMedicine,
+} from "../api";
+
+
 
 const MedicineList = () => {
-  const [medicines, setMedicines] = useState([
-    { _id: "1", name: "Paracetamol", dosage: "1 tablet", time: "09:00 AM", frequency: "Daily", status: "Pending" },
-    { _id: "2", name: "Vitamin D", dosage: "2 drops", time: "08:00 PM", frequency: "Daily", status: "Taken" },
-    { _id: "3", name: "Amoxicillin", dosage: "500mg", time: "02:00 PM", frequency: "Twice a day", status: "Missed" },
-  ]);
+   const [medicines, setMedicines] = useState([]);
+  const [loading, setLoading] = useState(true);
+  // Fetch all medicines from backend
+  const fetchMedicines = async () => {
+    try {
+      setLoading(true);
+      const { data } = await getMedicines();
+      setMedicines(data?.medicines || data); // depends on backend response
+    } catch (error) {
+      console.error("Error fetching medicines:", error);
+      alert("Failed to fetch medicines. Please check your server connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const markTaken = (id) => setMedicines(prev => prev.map(m => m._id === id ? { ...m, status: "Taken" } : m));
-  const markMissed = (id) => setMedicines(prev => prev.map(m => m._id === id ? { ...m, status: "Missed" } : m));
-  const deleteMedicine = (id) => setMedicines(prev => prev.filter(m => m._id !== id));
+  // Mark as Taken
+  const markTaken = async (id) => {
+    try {
+      await updateMedicine(id, { status: "Taken" });
+      setMedicines((prev) =>
+        prev.map((m) => (m._id === id ? { ...m, status: "Taken" } : m))
+      );
+    } catch (error) {
+      console.error("Error updating medicine status:", error);
+      alert("Failed to update status.");
+    }
+  };
+
+  // Mark as Missed
+  const markMissed = async (id) => {
+    try {
+      await updateMedicine(id, { status: "Missed" });
+      setMedicines((prev) =>
+        prev.map((m) => (m._id === id ? { ...m, status: "Missed" } : m))
+      );
+    } catch (error) {
+      console.error("Error updating medicine status:", error);
+      alert("Failed to update status.");
+    }
+  };
+
+  // Delete medicine
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+    try {
+      await deleteMedicine(id);
+      setMedicines((prev) => prev.filter((m) => m._id !== id));
+    } catch (error) {
+      console.error("Error deleting medicine:", error);
+      alert("Failed to delete medicine.");
+    }
+  };
+
+  useEffect(() => {
+    fetchMedicines();
+  }, []);
+
+  if (loading) return <p className="text-center text-gray-500 mt-10">Loading medicines...</p>;
+
+
+  
 
   const statusColors = {
     Taken: "bg-green-100 text-green-800",
@@ -19,7 +79,10 @@ const MedicineList = () => {
 
   return (
     <div className="max-w-4xl mx-auto mt-6 space-y-4">
-      <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">💊 Your Medicines</h2>
+       <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">
+        💊 Your Medicines
+      </h2>
+     
 
       {medicines.length === 0 ? (
         <p className="text-gray-500 text-center">No medicines added yet.</p>
@@ -34,12 +97,18 @@ const MedicineList = () => {
               <div className="flex-1 text-center sm:text-left space-y-1">
                 <h3 className="text-lg font-semibold text-indigo-600">{m.name}</h3>
                 <p className="text-gray-600">{m.dosage}</p>
-                <p className="text-gray-500 text-sm">{m.time} • {m.frequency}</p>
+               <p className="text-gray-500 text-sm">
+                  {m.time} • {m.frequency}
+                </p>
               </div>
 
               {/* Status Badge */}
               <div className="mt-3 sm:mt-0">
-                <span className={`px-3 py-1 rounded-full font-semibold ${statusColors[m.status]}`}>
+                <span
+                  className={`px-3 py-1 rounded-full font-semibold ${
+                    statusColors[m.status] || "bg-gray-100 text-gray-700"
+                  }`}
+                >
                   {m.status}
                 </span>
               </div>
@@ -59,7 +128,7 @@ const MedicineList = () => {
                   Missed
                 </button>
                 <button
-                  onClick={() => deleteMedicine(m._id)}
+                  onClick={() => handleDelete(m._id)}
                   className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-full transition duration-200"
                 >
                   Delete
