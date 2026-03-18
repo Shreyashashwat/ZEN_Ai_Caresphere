@@ -1,42 +1,76 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { loginUser, registerUser } from "../api";
 
 const HomePage = () => {
+  const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState(true);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
-    name: "",
+    username: "",
     email: "",
     password: "",
-    age: "",
+    age: 0,
     gender: "",
   });
 
+  const clearForms = () => {
+    setLoginData({ email: "", password: "" });
+    setRegisterData({ username: "", email: "", password: "", age: 0, gender: "" });
+  };
+
+  const handleToggle = (isLogin) => {
+    setShowLogin(isLogin);
+    clearForms(); 
+  };
+
   const handleLoginChange = (e) =>
     setLoginData({ ...loginData, [e.target.name]: e.target.value });
+
   const handleRegisterChange = (e) =>
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    alert("Login submitted!");
+    try {
+      const res = await loginUser(loginData);
+      console.log("Login success:", res.data);
+      localStorage.setItem("user", JSON.stringify(res.data));
+
+      alert("Login successful!");
+
+      navigate("/patient");
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("Login failed! Check credentials or server connection.");
+    }
   };
-  const handleRegisterSubmit = (e) => {
+
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    alert("Register submitted!");
+    try {
+      const res = await registerUser(registerData);
+      console.log("Registration success:", res.data);
+      alert("Registration successful!");
+
+      // Optional: switch to login after register
+      handleToggle(true);
+    } catch (error) {
+      console.error("Register error:", error);
+      alert("Registration failed! Try again.");
+    }
   };
 
   return (
     <div
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
       style={{
-        backgroundImage:
-          "url('/medical-technology-icon-set-health-wellness.jpg')",
+        backgroundImage: "url('/medical-technology-icon-set-health-wellness.jpg')",
       }}
     >
-      <div className="absolute inset-0 bg-black/40  backdrop-blur-xs"></div>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs"></div>
 
       <div className="relative z-10 flex flex-col items-center px-4">
-        {/* Logo */}
         <h1 className="text-5xl sm:text-6xl font-extrabold text-white mb-6 drop-shadow-lg">
           Care<span className="text-blue-300">Sphere</span>
         </h1>
@@ -44,12 +78,10 @@ const HomePage = () => {
           Track your medications, set reminders, and stay healthy!
         </p>
 
-        {/* Card */}
         <div className="bg-white/90 backdrop-blur-md w-full max-w-md p-8 rounded-3xl shadow-xl border border-white/20 transition-all duration-300">
-          {/* Toggle */}
           <div className="flex justify-center mb-6 rounded-full bg-gray-200/40 p-1">
             <button
-              onClick={() => setShowLogin(true)}
+              onClick={() => handleToggle(true)}
               className={`px-6 py-2 rounded-full font-semibold transition ${
                 showLogin
                   ? "bg-blue-600 text-white shadow-md"
@@ -59,7 +91,7 @@ const HomePage = () => {
               Login
             </button>
             <button
-              onClick={() => setShowLogin(false)}
+              onClick={() => handleToggle(false)}
               className={`px-6 py-2 rounded-full font-semibold transition ${
                 !showLogin
                   ? "bg-blue-600 text-white shadow-md"
@@ -70,7 +102,6 @@ const HomePage = () => {
             </button>
           </div>
 
-          {/* Form */}
           {showLogin ? (
             <form className="space-y-5" onSubmit={handleLoginSubmit}>
               <input
@@ -99,8 +130,8 @@ const HomePage = () => {
             <form className="space-y-5" onSubmit={handleRegisterSubmit}>
               <input
                 type="text"
-                name="name"
-                value={registerData.name}
+                name="username"
+                value={registerData.username}
                 onChange={handleRegisterChange}
                 placeholder="Name"
                 required
@@ -124,13 +155,11 @@ const HomePage = () => {
                 required
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
               />
-
-              {/* Age and Gender */}
               <div className="flex gap-4">
                 <input
                   type="number"
                   name="age"
-                  value={registerData.age}
+                  value={registerData.age || 0}
                   onChange={handleRegisterChange}
                   placeholder="Age"
                   min="0"
