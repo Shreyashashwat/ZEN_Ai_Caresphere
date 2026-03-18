@@ -23,7 +23,6 @@ ChartJS.register(
 );
 
 function DashboardChart() {
-  // Chart data
   const data = {
     labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
     datasets: [
@@ -32,12 +31,11 @@ function DashboardChart() {
         data: [120, 190, 300, 500, 200, 300],
         borderColor: "rgb(75, 192, 192)",
         backgroundColor: "rgba(75, 192, 192, 0.2)",
-        tension: 0.4, // smooth curve
+        tension: 0.4, 
       },
     ],
   };
 
-  // Chart options
   const options = {
     responsive: true,
     plugins: {
