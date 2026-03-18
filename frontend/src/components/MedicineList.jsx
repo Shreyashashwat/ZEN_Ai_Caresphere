@@ -1,137 +1,190 @@
-import React from "react";
-import { updateMedicine, deleteMedicine } from "../api";
+import React, { useState, useEffect } from "react";
+import { markasTaken, markasMissed, deleteMedicine } from "../api";
 
-const MedicineList = ({ medicines, onUpdate, onEdit }) => {
+const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 30000); // re-render every 30s
+    return () => clearInterval(interval);
+  }, []);
+
   const statusColors = {
     Taken: "bg-green-100 text-green-800",
     Missed: "bg-red-100 text-red-800",
     Pending: "bg-yellow-100 text-yellow-800",
   };
 
-  // ✅ Find next upcoming medicine
+  // ✅ Find next upcoming medicine safely
   const getNextMedicineId = () => {
     const now = new Date();
     let next = null;
 
-    medicines.forEach((m) => {
-      const times = Array.isArray(m.time) ? m.time : [m.time];
-      times.forEach((t) => {
-        const medicineTime = new Date(t);
-        if (medicineTime > now && (!next || medicineTime < new Date(next.time))) {
-          next = { ...m, time: t };
-        }
-      });
+    reminders.forEach((r) => {
+      if (!r || !r.medicineId) return;
+      const reminderTime = new Date(r.time);
+      if (reminderTime > now && (!next || reminderTime < new Date(next.time))) {
+        next = { _id: r.medicineId._id, time: r.time };
+      }
     });
+
     return next?._id;
   };
 
   const nextMedicineId = getNextMedicineId();
 
-  // ✅ Update medicine status
-  const updateStatus = async (id, status) => {
+  // ✅ Check if there is a pending reminder due for this medicine
+  const isReminderDue = (medicine) => {
+    const now = new Date();
+    return reminders.some((r) => {
+      if (!r?.medicineId) return false;
+      const reminderTime = new Date(r.time);
+      const status = r.status?.toLowerCase();
+
+      return (
+        r.medicineId._id === medicine._id &&
+        status === "pending" &&
+        reminderTime <= now
+      );
+    });
+  };
+
+  // ✅ Mark medicine as taken
+  const handleMarkTaken = async (medicine) => {
     try {
-      await updateMedicine(id, { status });
-      onUpdate();
+      const reminder = reminders.find((r) => {
+        if (!r?.medicineId) return false;
+        const reminderTime = new Date(r.time);
+        return (
+          r.medicineId._id === medicine._id &&
+          r.status?.toLowerCase() === "pending" &&
+          reminderTime <= new Date()
+        );
+      });
+      if (reminder) {
+        await markasTaken(reminder._id);
+        onUpdate();
+      }
     } catch (err) {
-      console.error("Error updating status:", err);
-      alert("Failed to update medicine status.");
+      console.error(err);
+      alert("Failed to mark as taken");
+    }
+  };
+
+  // ✅ Mark medicine as missed
+  const handleMarkMissed = async (medicine) => {
+    try {
+      const reminder = reminders.find((r) => {
+        if (!r?.medicineId) return false;
+        const reminderTime = new Date(r.time);
+        return (
+          r.medicineId._id === medicine._id &&
+          r.status?.toLowerCase() === "pending" &&
+          reminderTime <= new Date()
+        );
+      });
+      if (reminder) {
+        await markasMissed(reminder._id);
+        onUpdate();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to mark as missed");
     }
   };
 
   // ✅ Delete medicine
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
-    try {
-      await deleteMedicine(id);
-      onUpdate();
-    } catch (err) {
-      console.error("Error deleting medicine:", err);
-      alert("Failed to delete medicine.");
-    }
-  };
+const handleDelete = async (id) => {
+  if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+  try {
+    await deleteMedicine(id);
+    // Trigger refresh
+    onUpdate();
+  } catch (err) {
+    console.error(err);
+    alert("Failed to delete medicine.");
+  }
+};
 
-  // ✅ Check if reminder time has come or passed
-  const isReminderTime = (m) => {
-    const now = new Date();
-    const times = Array.isArray(m.time) ? m.time : [m.time];
-    return times.some((t) => new Date(t) <= now);
-  };
 
   if (!medicines || medicines.length === 0)
     return <p className="text-gray-500 text-center mt-10">No medicines added yet.</p>;
 
   return (
-    <div className="max-w-4xl mx-auto mt-6 space-y-4">
-      <h2 className="text-2xl font-bold text-gray-700 mb-4 text-center">
-        💊 Your Medicines
-      </h2>
+    <div className="max-w-4xl mx-auto mt-6">
+      <div className="sticky top-0 bg-white pb-2 z-10">
+        <h2 className="text-2xl font-bold text-gray-700 text-center">
+          💊 Your Medicines
+        </h2>
+      </div>
 
-      {medicines.map((m) => {
-        const reminderDue = isReminderTime(m);
+      {/* Scrollable container */}
+      <div className="max-h-96 overflow-y-auto pr-2 scroll-smooth space-y-4 mt-4 border border-gray-200 rounded-2xl p-4 shadow-sm bg-gray-50">
+        {medicines.map((m) => {
+          const reminderDue = isReminderDue(m);
 
-        return (
-          <div
-            key={m._id}
-            className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border ${
-              m._id === nextMedicineId
-                ? "bg-indigo-50 border-indigo-300 shadow-lg"
-                : "bg-white border-gray-100"
-            } hover:shadow-xl transition duration-200`}
-          >
-            <div className="flex-1 text-center sm:text-left space-y-1">
-              <h3 className="text-lg font-semibold text-indigo-600">
-                {m.medicineName || m.name}
-              </h3>
-              <p className="text-gray-600">{m.dosage}</p>
-              <p className="text-gray-500 text-sm">
-                {Array.isArray(m.time) ? m.time.join(", ") : m.time} • {m.frequency}
-              </p>
-            </div>
+          return (
+            <div
+              key={m._id}
+              className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border ${
+                m._id === nextMedicineId
+                  ? "bg-indigo-50 border-indigo-300 shadow-lg"
+                  : "bg-white border-gray-100"
+              } hover:shadow-xl transition duration-200`}
+            >
+              <div className="flex-1 text-center sm:text-left space-y-1">
+                <h3 className="text-lg font-semibold text-indigo-600">
+                  {m.medicineName || m.name}
+                </h3>
+                <p className="text-gray-600">{m.dosage}</p>
+                <p className="text-gray-500 text-sm">{m.frequency}</p>
+              </div>
 
-            <div className="mt-3 sm:mt-0">
-              <span
-                className={`px-3 py-1 rounded-full font-semibold ${
-                  statusColors[m.status] || "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {m.status || "Pending"}
-              </span>
-            </div>
-
-            <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">
-              {reminderDue ? (
-                <>
-                  <button
-                    onClick={() => updateStatus(m._id, "Taken")}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full transition duration-200"
-                  >
-                    Mark as Taken
-                  </button>
-                  <button
-                    onClick={() => updateStatus(m._id, "Missed")}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full transition duration-200"
-                  >
-                    Mark as Missed
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => onEdit && onEdit(m)}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded-full transition duration-200"
+              <div className="mt-3 sm:mt-0">
+                <span
+                  className={`px-3 py-1 rounded-full font-semibold ${
+                    statusColors[m.status] || "bg-gray-100 text-gray-700"
+                  }`}
                 >
-                  Edit
+                  {m.status || "Pending"}
+                </span>
+              </div>
+
+              <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">
+                {reminderDue ? (
+                  <>
+                    <button
+                      onClick={() => handleMarkTaken(m)}
+                      className="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full transition duration-200"
+                    >
+                      Mark as Taken
+                    </button>
+                    <button
+                      onClick={() => handleMarkMissed(m)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full transition duration-200"
+                    >
+                      Mark as Missed
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => onEdit && onEdit(m)}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded-full transition duration-200"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDelete(m._id)}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-full transition duration-200"
+                >
+                  Delete
                 </button>
-              )}
-              <button
-                onClick={() => handleDelete(m._id)}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-full transition duration-200"
-              >
-                Delete
-              </button>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };

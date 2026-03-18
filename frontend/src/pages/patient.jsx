@@ -8,25 +8,27 @@ import DashboardChart from "../components/DashboardChart";
 
 import {
   getMedicines,
-  addMedicine,
-  updateMedicine,
-  deleteMedicine,
+ 
   fetchHistory,
   getReminders,
 } from "../api";
 
 const Patient = () => {
+  const [selectedMedicine, setSelectedMedicine] = useState(null);
+
+  const navigate = useNavigate();
   const [medicines, setMedicines] = useState([]);
   const [history, setHistory] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [nextReminder, setNextReminder] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // triggers updates for dashboard/calendar
 
   // Fetch medicines from backend
   const fetchMedicines = async () => {
     try {
-      const res = await getMedicines();       // res.data is ApiResponse
+      const res = await getMedicines();
     const medicinesArray = Array.isArray(res.data.data) ? res.data.data : [];
-    setMedicines(medicinesArray);
+    setMedicines([...medicinesArray]); // create new array to trigger re-render
     } catch (err) {
       console.error("Failed to fetch medicines:", err);
     }
@@ -39,8 +41,10 @@ const Patient = () => {
       const res = await fetchHistory();
       // Sort by time
      const historyData = res.data.data || [];
-    const sortedHistory = historyData.sort((a, b) => new Date(a.time) - new Date(b.time));
-      setHistory(sortedHistory);
+    const sortedHistory = historyData.sort(
+        (a, b) => new Date(a.time) - new Date(b.time)
+      );
+      setHistory([...sortedHistory]); // new array for re-render
     } catch (err) {
       console.error("Failed to fetch history:", err);
     }
@@ -50,16 +54,33 @@ const Patient = () => {
   const fetchReminders = async () => {
     try {
       const res = await getReminders(); 
-    const remindersArray = Array.isArray(res.data.reminders) ? res.data.reminders : [];
-    setReminders(remindersArray);
+    const remindersArray = Array.isArray(res.data.data) ? res.data.data : [];
 
-    if (remindersArray.length > 0) {
-      setNextReminder(remindersArray[0]);
-      }
+    // Sort by time ascending & normalize status
+    remindersArray.sort((a, b) => new Date(a.time) - new Date(b.time));
+    remindersArray.forEach(r => {
+      if (r.status) r.status = r.status.toLowerCase();
+    });
+
+    setReminders([...remindersArray]); // ✅ only set reminders
     } catch (err) {
       console.error("Failed to fetch reminders:", err);
     }
   };
+  // Recalculate next reminder whenever reminders change
+// Recalculate next reminder whenever reminders change
+useEffect(() => {
+  const now = new Date();
+  const upcoming = reminders
+    .filter(r => r.medicineId) // filter out reminders whose medicine was deleted
+    .find(r => new Date(r.time) >= now && r.status === "pending");
+
+  setNextReminder(upcoming || null);
+}, [reminders]);
+
+
+
+  // Initial fetch
 
   useEffect(() => {
     fetchMedicines();
@@ -68,10 +89,15 @@ const Patient = () => {
   }, []);
 
   // Callback after adding or updating a medicine
-  const handleMedicineUpdate = () => {
-    fetchMedicines();
-    fetchHistoryData();
-  };
+// Update handler (after marking medicine taken/missed or adding/deleting)
+ const handleMedicineUpdate = async () => {
+  try {
+    await Promise.all([fetchMedicines(), fetchHistoryData(), fetchReminders()]);
+  } catch (err) {
+    console.error("Failed to update medicines/reminders/history", err);
+  }
+};
+
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -117,7 +143,7 @@ const Patient = () => {
                 ? `${new Date(nextReminder.time).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
-                  })} — ${nextReminder.medicationId?.medicineName} 💊`
+                  })} — ${nextReminder.medicineId?.medicineName} 💊`
                 : "No upcoming reminders"}
             </p>
           </div>
@@ -129,14 +155,20 @@ const Patient = () => {
             <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
               ➕ Add / Edit Medicine
             </h2>
-            <MedicineForm onSuccess={handleMedicineUpdate} />
+            <MedicineForm onSuccess={handleMedicineUpdate} medicine={selectedMedicine}
+/>
           </div>
 
           <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">
             <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
               💊 Medicine List
             </h2>
-            <MedicineList medicines={medicines} onUpdate={handleMedicineUpdate} />
+           <MedicineList
+              medicines={medicines}
+              reminders={reminders}
+              onUpdate={handleMedicineUpdate}
+               onEdit={setSelectedMedicine}
+            />
           </div>
         </div>
 
@@ -147,14 +179,14 @@ const Patient = () => {
               <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
                 📊 Progress Overview
               </h2>
-              <DashboardChart history={history} />
+             <DashboardChart key={refreshTrigger} history={history} />
             </div>
 
             <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">
               <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
                 📅 Calendar
               </h2>
-              <CalendarView reminders={reminders} />
+              <CalendarView key={refreshTrigger} reminders={reminders} />
             </div>
           </div>
 

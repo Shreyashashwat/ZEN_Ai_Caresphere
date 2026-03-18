@@ -1,7 +1,6 @@
-import React, { useState } from "react";
-import { addMedicine, addReminder } from "../api";
-
-const MedicineForm = ({ onSuccess }) => {
+import React, { useEffect, useState } from "react";
+import { addMedicine, updateMedicine, addReminder } from "../api";
+const MedicineForm = ({ onSuccess, medicine }) => {
   const [formData, setFormData] = useState({
     medicineName: "",
     dosage: "",
@@ -12,6 +11,26 @@ const MedicineForm = ({ onSuccess }) => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(!!medicine?._id);
+
+  // Fill form if editing
+  useEffect(() => {
+    if (medicine) {
+      setFormData({
+        medicineName: medicine.medicineName || "",
+        dosage: medicine.dosage || "",
+        frequency: medicine.frequency || "daily",
+        time: medicine.time || [""],
+        startDate: medicine.startDate
+          ? new Date(medicine.startDate).toISOString().split("T")[0]
+          : "",
+        endDate: medicine.endDate
+          ? new Date(medicine.endDate).toISOString().split("T")[0]
+          : "",
+      });
+      setIsEditing(true);
+    }
+  }, [medicine]);
 
   // handle field changes
   const handleChange = (e) => {
@@ -27,9 +46,9 @@ const MedicineForm = ({ onSuccess }) => {
   };
 
   // add another time input
-  const addTimeField = () => {
+  const addTimeField = () => 
     setFormData({ ...formData, time: [...formData.time, ""] });
-  };
+  
 
   // remove a time input
   const removeTimeField = (index) => {
@@ -41,53 +60,64 @@ const MedicineForm = ({ onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user || !user._id) {
-        alert(" User not found. Please log in again.");
+        alert("User not found. Please log in again.");
+        setLoading(false);
         return;
       }
 
-      const data = { ...formData, userId: user._id };
-      await addMedicine(data);
-      alert("Medicine added successfully!");
-        // 1️⃣ Add medicine
       const medicineData = { ...formData, userId: user._id };
-      const res = await addMedicine(medicineData);
-    const medicineId =res.data.data._id;
+      let medicineId;
 
-      // 2️⃣ Add reminders for each time
-      for (const t of formData.time) {
-        const start = new Date(formData.startDate);
-        const end = formData.endDate ? new Date(formData.endDate) : start;
+      if (isEditing) {
+        const res = await updateMedicine(medicine._id, medicineData);
+        medicineId = res.data.data._id;
+        alert("Medicine updated successfully!");
+      } else {
+        const res = await addMedicine(medicineData);
+        medicineId = res.data.data._id;
+        alert("Medicine added successfully!");
 
-        const step = formData.frequency === "daily" ? 1 : formData.frequency === "weekly" ? 7 : 0;
+        // 2) Add reminders for each time
+        for (const t of formData.time) {
+          const start = new Date(formData.startDate);
+          const end = formData.endDate ? new Date(formData.endDate) : start;
 
-        for (let d = new Date(start); step > 0 && d <= end; d.setDate(d.getDate() + step)) {
-          const [hours, minutes] = t.split(":");
-          const reminderTime = new Date(d);
-          reminderTime.setHours(hours, minutes, 0, 0);
+          const step =
+            formData.frequency === "daily"
+              ? 1
+              : formData.frequency === "weekly"
+              ? 7
+              : 0;
 
-          await addReminder({
-            medicineId,
-            time: reminderTime.toISOString(),
-          });
-        }
+          for (
+            let d = new Date(start);
+            step > 0 && d <= end;
+            d.setDate(d.getDate() + step)
+          ) {
+            const [hours, minutes] = t.split(":");
+            const reminderTime = new Date(d);
+            reminderTime.setHours(hours, minutes, 0, 0);
 
-        // For "as needed", just create one reminder per time
-        if (formData.frequency === "as needed") {
-          const [hours, minutes] = t.split(":");
-          const reminderTime = new Date(start);
-          reminderTime.setHours(hours, minutes, 0, 0);
+            await addReminder({ medicineId, time: reminderTime.toISOString() });
+          }
 
-          await addReminder({
-            medicineId,
-            time: reminderTime.toISOString(),
-          });
+          // For "as needed", create one reminder per selected time
+          if (formData.frequency === "as needed") {
+            const [hours, minutes] = t.split(":");
+            const reminderTime = new Date(start);
+            reminderTime.setHours(hours, minutes, 0, 0);
+
+            await addReminder({
+              medicineId,
+              time: reminderTime.toISOString(),
+            });
+          }
         }
       }
-
-      alert("Medicine and reminders added successfully!");
 
       // reset form
       setFormData({
@@ -98,11 +128,12 @@ const MedicineForm = ({ onSuccess }) => {
         startDate: "",
         endDate: "",
       });
+      setIsEditing(false);
 
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error(err);
-      alert("Failed to add medicine or reminders");
+      alert("Failed to save medicine or reminders");
     } finally {
       setLoading(false);
     }
@@ -114,7 +145,7 @@ const MedicineForm = ({ onSuccess }) => {
       className="max-w-lg mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-5"
     >
       <h2 className="text-2xl font-semibold text-gray-700 text-center">
-        Add Medicine
+       {isEditing ? "Update Medicine" : "Add Medicine"}
       </h2>
 
       <input
@@ -211,7 +242,11 @@ const MedicineForm = ({ onSuccess }) => {
           loading ? "opacity-60 cursor-not-allowed" : ""
         }`}
       >
-          {loading ? "Saving..." : "Save Medicine & Reminders"}
+         {loading
+          ? "Saving..."
+          : isEditing
+          ? "Update Medicine"
+          : "Save Medicine & Reminders"}
       </button>
     </form>
   );

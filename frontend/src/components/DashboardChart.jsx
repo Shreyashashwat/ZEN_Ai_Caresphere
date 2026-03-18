@@ -6,21 +6,20 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { getDashboardStats } from "../api"; // import your API function
+import { getDashboardStats } from "../api";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const DashboardChart = () => {
+const DashboardChart = ({ refreshTrigger }) => {
   const [stats, setStats] = useState({ taken: 0, missed: 0 });
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
     try {
       const { data } = await getDashboardStats();
-      // assuming API returns: { taken: number, missed: number }
       setStats({
-        taken: data.taken || 0,
-        missed: data.missed || 0,
+        taken: data.data.taken || 0,
+        missed: data.data.missed || 0,
       });
       setLoading(false);
     } catch (err) {
@@ -29,13 +28,10 @@ const DashboardChart = () => {
     }
   };
 
+  // Refetch whenever refreshTrigger changes
   useEffect(() => {
     fetchStats();
-
-    // optional: refresh stats every 10s
-    const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [refreshTrigger]);
 
   const data = {
     labels: ["Taken", "Missed"],
