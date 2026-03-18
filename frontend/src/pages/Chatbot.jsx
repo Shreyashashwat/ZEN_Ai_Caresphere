@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 
-function ChatWidget({ userId, authToken }) {
+function ChatWidget() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll
+  // 🧩 Load userId and token from localStorage
+  const storedUser = JSON.parse(localStorage.getItem("user"));
+  const userId = storedUser?._id;
+  const authToken = storedUser?.token;
+
+  // Auto-scroll when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -21,9 +26,12 @@ function ChatWidget({ userId, authToken }) {
     setMessages((msgs) => [...msgs, userMessage]);
 
     try {
+      // 🧠 Log what’s being sent for debugging
+      console.log("Sending message with token:", authToken);
+
       const resp = await axios.post(
         "http://localhost:8000/api/v1/chatbot",
-        { user_id: userId, message: inputText },
+        { userId, message: inputText },
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
