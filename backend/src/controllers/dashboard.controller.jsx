@@ -1,7 +1,7 @@
 import { ApiResponse } from "../utils/ApiResponse";
-import { Reminder } from "../model/reminderstatus";
+import { Reminder } from "../model/reminderstatus.js";
 import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 const getDashboardStats=asyncHandler(async(req,res)=>{
     const userId=req.userId;
     if(!userId) throw new ApiError(400,"User Id missing");

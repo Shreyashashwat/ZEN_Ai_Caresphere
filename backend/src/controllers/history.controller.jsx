@@ -20,7 +20,7 @@ const getHistory = asyncHandler(async (req, res) => {
   );
 
 
-  history.sort((a, b) => b.time - a.time);
+  history.sort((a, b) => new Date(b.time) - new Date(a.time));
 
   return res
     .status(200)

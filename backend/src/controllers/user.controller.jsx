@@ -52,18 +52,18 @@ const loginUser=asyncHandler(async(req,res)=>{
     if(!email){
         throw new ApiError(400,"Email is required")
     }
-    const user=await User.findby({
+    const user=await User.findOne({
        email
     })
     if(!user){
         throw new ApiError(404,"User not found")
     }
-    const isPasswordValid=await User.isPasswordCorrect(password)
+    const isPasswordValid=await user.isPasswordCorrect(password)
     if(!isPasswordValid){
         throw new ApiError(401,"Incorrect Password")
     }
     const {AcessToken,RefreshToken}=await generateAcessNdRefreshToken(user._id)
-    const loggedInUser=await User.findById(user._id).select
+     const loggedInUser=await User.findById(user._id).select("-password -refreshToken")
      const option={
         httpOnly:true,
         secure:true

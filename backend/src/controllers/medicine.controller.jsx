@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Medicine } from "../model/medicine.model.js";
 
 
-const getNotes = asyncHandler(async (req, res) => {
+const getMedicines = asyncHandler(async (req, res) => {
   const userId = req.userId;
   if (!userId) throw new ApiError(400, "User ID missing");
 
@@ -61,11 +61,11 @@ const deleteMedicine = asyncHandler(async (req, res) => {
 });
 
 
-const getMedicineById = asyncHandler(async (req, res) => {
+const getMedicine = asyncHandler(async (req, res) => {
   const medicine = await Medicine.findById(req.params.id);
   if (!medicine) throw new ApiError(404, "Medicine not found");
 
   return res.status(200).json(new ApiResponse(200, medicine, "Medicine fetched successfully"));
 });
 
-export { getNotes, addMedicine, updateMedicine, deleteMedicine, getMedicineById };
+export { getMedicines, addMedicine, updateMedicine, deleteMedicine, getMedicine, };
