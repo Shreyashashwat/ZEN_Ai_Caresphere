@@ -13,7 +13,12 @@ const HomePage = () => {
     age: 0,
     gender: "",
   });
-
+  useEffect(() => {
+    fetch("http://localhost:8000/test",)
+      .then((res) => res.text())
+      .then(console.log)
+      .catch(console.error);
+    }, []);
   const clearForms = () => {
     setLoginData({ email: "", password: "" });
     setRegisterData({ username: "", email: "", password: "", age: 0, gender: "" });

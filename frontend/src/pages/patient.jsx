@@ -10,7 +10,7 @@ import {
   addMedicine,
   updateMedicine,
   deleteMedicine,
-  getHistory,
+  fetchHistory,
   getReminders,
 } from "../api";
 
@@ -33,8 +33,8 @@ const Patient = () => {
   // Fetch history
   const fetchHistoryData = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem("user"));
-      const { data } = await getHistory(user._id);
+      const user = JSON.parse(localStorage.getItem("users"));
+      const { data } = await fetchHistory(user._id);
       // Sort by time
       const sortedHistory = data.sort((a, b) => new Date(a.time) - new Date(b.time));
       setHistory(sortedHistory);
