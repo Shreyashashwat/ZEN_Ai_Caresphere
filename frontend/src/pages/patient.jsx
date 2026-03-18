@@ -8,7 +8,6 @@ import DashboardChart from "../components/DashboardChart";
 
 import {
   getMedicines,
- 
   fetchHistory,
   getReminders,
 } from "../api";
@@ -22,26 +21,24 @@ const Patient = () => {
   const [reminders, setReminders] = useState([]);
   const [nextReminder, setNextReminder] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // triggers updates for dashboard/calendar
-
-  // Fetch medicines from backend
+   
+  // Fetch Medicines
   const fetchMedicines = async () => {
     try {
       const res = await getMedicines();
-    const medicinesArray = Array.isArray(res.data.data) ? res.data.data : [];
-    setMedicines([...medicinesArray]); // create new array to trigger re-render
+      const medicinesArray = Array.isArray(res.data.data) ? res.data.data : [];
+      setMedicines([...medicinesArray]); // create new array to trigger re-render
     } catch (err) {
       console.error("Failed to fetch medicines:", err);
     }
   };
 
-  // Fetch history
+  // Fetch History
   const fetchHistoryData = async () => {
     try {
-      
       const res = await fetchHistory();
-      // Sort by time
-     const historyData = res.data.data || [];
-    const sortedHistory = historyData.sort(
+      const historyData = res.data.data || [];
+      const sortedHistory = historyData.sort(
         (a, b) => new Date(a.time) - new Date(b.time)
       );
       setHistory([...sortedHistory]); // new array for re-render
@@ -50,10 +47,11 @@ const Patient = () => {
     }
   };
 
-  // Fetch reminders
-  const fetchReminders = async () => {
-    try {
-      const res = await getReminders(); 
+  // Fetch Reminders
+  // Fetch Reminders
+const fetchReminders = async () => {
+  try {
+    const res = await getReminders();
     const remindersArray = Array.isArray(res.data.data) ? res.data.data : [];
 
     // Sort by time ascending & normalize status
@@ -63,11 +61,11 @@ const Patient = () => {
     });
 
     setReminders([...remindersArray]); // ✅ only set reminders
-    } catch (err) {
-      console.error("Failed to fetch reminders:", err);
-    }
-  };
-  // Recalculate next reminder whenever reminders change
+  } catch (err) {
+    console.error("Failed to fetch reminders:", err);
+  }
+};
+// Recalculate next reminder whenever reminders change
 // Recalculate next reminder whenever reminders change
 useEffect(() => {
   const now = new Date();
@@ -81,15 +79,13 @@ useEffect(() => {
 
 
   // Initial fetch
-
   useEffect(() => {
     fetchMedicines();
     fetchHistoryData();
     fetchReminders();
   }, []);
 
-  // Callback after adding or updating a medicine
-// Update handler (after marking medicine taken/missed or adding/deleting)
+  // Update handler (after marking medicine taken/missed or adding/deleting)
  const handleMedicineUpdate = async () => {
   try {
     await Promise.all([fetchMedicines(), fetchHistoryData(), fetchReminders()]);
@@ -101,7 +97,7 @@ useEffect(() => {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-   navigate("/"); 
+    navigate("/");
   };
 
   return (
@@ -121,9 +117,9 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* Main */}
+      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-10 space-y-10">
-        {/* Welcome + Next Reminder */}
+        {/* Welcome & Next Reminder */}
         <section className="bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-3xl p-8 shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-semibold mb-2">
@@ -149,7 +145,7 @@ useEffect(() => {
           </div>
         </section>
 
-        {/* Add / List Medicines */}
+        {/* Medicine Form & List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">
             <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
@@ -163,7 +159,7 @@ useEffect(() => {
             <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
               💊 Medicine List
             </h2>
-           <MedicineList
+            <MedicineList
               medicines={medicines}
               reminders={reminders}
               onUpdate={handleMedicineUpdate}
@@ -172,14 +168,14 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Dashboard Charts + Calendar */}
+        {/* Dashboard & Calendar & History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">
               <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
                 📊 Progress Overview
               </h2>
-             <DashboardChart key={refreshTrigger} history={history} />
+              <DashboardChart key={refreshTrigger} history={history} />
             </div>
 
             <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">

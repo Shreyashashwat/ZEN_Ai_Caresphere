@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser, registerUser } from "../api";
+
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -13,7 +14,8 @@ const HomePage = () => {
     age: 0,
     gender: "",
   });
-  
+   
+
   const clearForms = () => {
     setLoginData({ email: "", password: "" });
     setRegisterData({ username: "", email: "", password: "", age: 0, gender: "" });
@@ -30,25 +32,28 @@ const HomePage = () => {
   const handleRegisterChange = (e) =>
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
 
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await loginUser(loginData);
-      console.log("Login success:", res.data);
-      const { user, token } = res.data.data;
+const handleLoginSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const res = await loginUser(loginData);
+    console.log("Login success:", res.data);
+
+  
+    const { user, token } = res.data.data;
 
     localStorage.setItem(
       "user",
       JSON.stringify({ _id: user._id, username: user.username,token })
     );
-      alert("Login successful!");
 
-      navigate("/patient");
-    } catch (error) {
-      console.error("Login error:", error);
-      alert("Login failed! Check credentials or server connection.");
-    }
-  };
+    alert("Login successful!");
+    navigate("/patient");
+  } catch (error) {
+    console.error("Login error:", error);
+    alert("Login failed! Check credentials or server connection.");
+  }
+};
+
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
@@ -57,7 +62,7 @@ const HomePage = () => {
       console.log("Registration success:", res.data);
       alert("Registration successful!");
 
-      // Optional: switch to login after register
+      
       handleToggle(true);
     } catch (error) {
       console.error("Register error:", error);

@@ -5,11 +5,10 @@ const MedicineForm = ({ onSuccess, medicine }) => {
     medicineName: "",
     dosage: "",
     frequency: "daily",
-    time: [""], // multiple times possible
+    time: [""],
     startDate: "",
     endDate: "",
   });
-
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(!!medicine?._id);
 
@@ -32,31 +31,25 @@ const MedicineForm = ({ onSuccess, medicine }) => {
     }
   }, [medicine]);
 
-  // handle field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // handle time input changes
   const handleTimeChange = (index, value) => {
     const newTimes = [...formData.time];
     newTimes[index] = value;
     setFormData({ ...formData, time: newTimes });
   };
 
-  // add another time input
-  const addTimeField = () => 
+  const addTimeField = () =>
     setFormData({ ...formData, time: [...formData.time, ""] });
-  
 
-  // remove a time input
   const removeTimeField = (index) => {
     const newTimes = formData.time.filter((_, i) => i !== index);
     setFormData({ ...formData, time: newTimes });
   };
 
-  // handle submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -119,7 +112,45 @@ const MedicineForm = ({ onSuccess, medicine }) => {
         }
       }
 
-      // reset form
+      if (isEditing) {
+        const res = await updateMedicine(medicine._id, medicineData);
+        medicineId = res.data.data._id;
+        alert("Medicine updated successfully!");
+      } else {
+        const res = await addMedicine(medicineData);
+        medicineId = res.data.data._id;
+        alert("Medicine added successfully!");
+
+        // Add reminders only for new medicine
+        for (const t of formData.time) {
+          const start = new Date(formData.startDate);
+          const end = formData.endDate ? new Date(formData.endDate) : start;
+
+          const step =
+            formData.frequency === "daily"
+              ? 1
+              : formData.frequency === "weekly"
+              ? 7
+              : 0;
+
+          for (let d = new Date(start); step > 0 && d <= end; d.setDate(d.getDate() + step)) {
+            const [hours, minutes] = t.split(":");
+            const reminderTime = new Date(d);
+            reminderTime.setHours(hours, minutes, 0, 0);
+
+            await addReminder({ medicineId, time: reminderTime.toISOString() });
+          }
+
+          if (formData.frequency === "as needed") {
+            const [hours, minutes] = t.split(":");
+            const reminderTime = new Date(start);
+            reminderTime.setHours(hours, minutes, 0, 0);
+            await addReminder({ medicineId, time: reminderTime.toISOString() });
+          }
+        }
+      }
+
+      // Reset form and editing mode
       setFormData({
         medicineName: "",
         dosage: "",

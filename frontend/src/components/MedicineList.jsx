@@ -15,7 +15,6 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     Pending: "bg-yellow-100 text-yellow-800",
   };
 
-  // ✅ Find next upcoming medicine safely
   const getNextMedicineId = () => {
     const now = new Date();
     let next = null;
@@ -33,7 +32,6 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
 
   const nextMedicineId = getNextMedicineId();
 
-  // ✅ Check if there is a pending reminder due for this medicine
   const isReminderDue = (medicine) => {
     const now = new Date();
     return reminders.some((r) => {
@@ -49,7 +47,6 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     });
   };
 
-  // ✅ Mark medicine as taken
   const handleMarkTaken = async (medicine) => {
     try {
       const reminder = reminders.find((r) => {
@@ -71,7 +68,6 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     }
   };
 
-  // ✅ Mark medicine as missed
   const handleMarkMissed = async (medicine) => {
     try {
       const reminder = reminders.find((r) => {
@@ -93,12 +89,10 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     }
   };
 
-  // ✅ Delete medicine
 const handleDelete = async (id) => {
   if (!window.confirm("Are you sure you want to delete this medicine?")) return;
   try {
     await deleteMedicine(id);
-    // Trigger refresh
     onUpdate();
   } catch (err) {
     console.error(err);
@@ -118,7 +112,6 @@ const handleDelete = async (id) => {
         </h2>
       </div>
 
-      {/* Scrollable container */}
       <div className="max-h-96 overflow-y-auto pr-2 scroll-smooth space-y-4 mt-4 border border-gray-200 rounded-2xl p-4 shadow-sm bg-gray-50">
         {medicines.map((m) => {
           const reminderDue = isReminderDue(m);
