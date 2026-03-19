@@ -39,4 +39,39 @@ def get_history(session_id: str) -> list:
     
 
 
-    
+def append_messages(session_id: str, user_message: str, assistant_message: str) -> None:
+    """
+    Append a user+assistant pair to session history.
+    Trims to MAX_HISTORY and resets TTL.
+    """
+    try:
+        r = _get_client()
+        history = get_history(session_id)
+
+        history.append({"role": "user",      "content": user_message})
+        history.append({"role": "assistant", "content": assistant_message})
+
+ 
+        if len(history) > MAX_HISTORY:
+            history = history[-MAX_HISTORY:]
+
+        r.set(_key(session_id), json.dumps(history), ex=TTL_SECONDS)
+
+    except Exception as e:
+        print(f"[MemoryStore] append_messages error: {e}")
+
+
+def clear_session(session_id: str) -> None:
+    """Delete a session's history from Redis."""
+    try:
+        _get_client().delete(_key(session_id))
+    except Exception as e:
+        print(f"[MemoryStore] clear_session error: {e}")
+
+
+def ping() -> bool:
+    """Check if Redis is reachable. Used in health check."""
+    try:
+        return _get_client().ping()
+    except Exception:
+        return False
