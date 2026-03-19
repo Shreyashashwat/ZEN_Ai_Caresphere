@@ -23,6 +23,7 @@
     "express": "^5.1.0",
     "firebase": "^12.11.0",
     "jsonwebtoken": "^9.0.2",
+     "lucide-react": "^0.548.0",
     "mongoose": "^8.19.1",
     "react": "^19.2.0",
     "react-calendar": "^6.0.0",

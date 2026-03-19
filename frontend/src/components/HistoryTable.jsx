@@ -47,10 +47,7 @@ const HistoryTable = () => {
               </thead>
               <tbody>
                 {history.map((h) => (
-                  <tr
-                    key={`${h.time}-${h.medicineName}`}
-                    className="hover:bg-gray-50 transition"
-                  >
+                  <tr key={h._id || `${h.time}-${h.medicineName}-${Math.random()}`} className="hover:bg-gray-50 transition">
                     <td className="py-2 px-4 border-b">
                       {new Date(h.time).toLocaleDateString()}
                     </td>

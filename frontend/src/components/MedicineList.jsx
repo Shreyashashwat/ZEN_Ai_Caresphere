@@ -3,46 +3,43 @@ import { markasTaken, markasMissed, deleteMedicine } from "../api";
 
 const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
   const [tick, setTick] = useState(0);
-  const [highlighted, setHighlighted] = useState({}); // Track temporary highlights
+  const [highlighted, setHighlighted] = useState({});
 
+  // Re-render every 30s
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 30000); // Re-render every 30s
+    const interval = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-mark missed reminders
   useEffect(() => {
-  const checkMissedReminders = async () => {
-    const now = new Date();
+    const checkMissedReminders = async () => {
+      const now = new Date();
+      const overdueReminders = reminders.filter((r) => {
+        if (!r?.medicineId || !r.time) return false;
+        const reminderTime = new Date(r.time);
+        const oneHourLater = new Date(reminderTime.getTime() + 60 * 60000);
+        return r.status?.toLowerCase() === "pending" && oneHourLater <= now;
+      });
 
-    const overdueReminders = reminders.filter((r) => {
-      if (!r?.medicineId || !r.time) return false;
-
-      const reminderTime = new Date(r.time);
-      const status = r.status?.toLowerCase();
-      const oneHourLater = new Date(reminderTime.getTime() + 60 * 60000);
-
-      return status === "pending" && oneHourLater <= now;
-    });
-
-    for (const r of overdueReminders) {
-      try {
-        await markasMissed(r._id);
-        console.log("Auto-marked as missed:", r._id);
-      } catch (err) {
-        console.error("Auto-miss failed", err);
+      for (const r of overdueReminders) {
+        try {
+          await markasMissed(r._id);
+          console.log("Auto-marked as missed:", r._id);
+        } catch (err) {
+          console.error("Auto-miss failed", err);
+        }
       }
-    }
+      if (overdueReminders.length > 0) onUpdate();
+    };
 
-    if (overdueReminders.length > 0) onUpdate();
-  };
+    checkMissedReminders();
+  }, [tick, reminders, onUpdate]);
 
-  checkMissedReminders();
-}, [tick, reminders, onUpdate]);
-
+  // Get next medicine (upcoming)
   const getNextMedicineId = () => {
     const now = new Date();
     let next = null;
-
     reminders.forEach((r) => {
       if (!r || !r.medicineId) return;
       const reminderTime = new Date(r.time);
@@ -50,10 +47,8 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
         next = { _id: r.medicineId._id, time: r.time };
       }
     });
-
     return next?._id;
   };
-
   const nextMedicineId = getNextMedicineId();
 
   const isReminderDue = (medicine) => {
@@ -61,11 +56,9 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     return reminders.some((r) => {
       if (!r?.medicineId) return false;
       const reminderTime = new Date(r.time);
-      const status = r.status?.toLowerCase();
-
       return (
         r.medicineId._id === medicine._id &&
-        status === "pending" &&
+        r.status?.toLowerCase() === "pending" &&
         reminderTime <= now
       );
     });
@@ -85,13 +78,11 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
 
       if (reminder) {
         await markasTaken(reminder._id);
-
-        // Temporarily highlight green
-        setHighlighted((prev) => ({ ...prev, [medicine._id]: "taken" }));
-        setTimeout(() => {
-          setHighlighted((prev) => ({ ...prev, [medicine._id]: null }));
-        }, 3000);
-
+        setHighlighted((p) => ({ ...p, [medicine._id]: "taken" }));
+        setTimeout(
+          () => setHighlighted((p) => ({ ...p, [medicine._id]: null })),
+          3000
+        );
         onUpdate();
       }
     } catch (err) {
@@ -114,13 +105,11 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
 
       if (reminder) {
         await markasMissed(reminder._id);
-
-        // Temporarily highlight red
-        setHighlighted((prev) => ({ ...prev, [medicine._id]: "missed" }));
-        setTimeout(() => {
-          setHighlighted((prev) => ({ ...prev, [medicine._id]: null }));
-        }, 3000);
-
+        setHighlighted((p) => ({ ...p, [medicine._id]: "missed" }));
+        setTimeout(
+          () => setHighlighted((p) => ({ ...p, [medicine._id]: null })),
+          3000
+        );
         onUpdate();
       }
     } catch (err) {
@@ -141,69 +130,84 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
   };
 
   if (!medicines || medicines.length === 0)
-    return <p className="text-gray-500 text-center mt-10">No medicines added yet.</p>;
+    return (
+      <p className="text-gray-500 text-center mt-12 text-lg">
+        No medicines added yet.
+      </p>
+    );
 
   return (
-    <div className="max-w-4xl mx-auto mt-6">
-      <div className="sticky top-0 bg-white pb-2 z-10">
-        <h2 className="text-2xl font-bold text-gray-700 text-center">
-          💊 Your Medicines
-        </h2>
-      </div>
+    <div className="max-w-4xl mx-auto mt-10 p-8 rounded-3xl shadow-2xl 
+                    bg-gradient-to-br from-indigo-50 via-white to-purple-50 
+                    border border-indigo-100">
+      <h2 className="text-3xl font-bold text-indigo-700 mb-6 flex items-center gap-2 justify-center">
+        💊 Medicine List
+      </h2>
 
-      <div className="max-h-96 overflow-y-auto pr-2 scroll-smooth space-y-4 mt-4 border border-gray-200 rounded-2xl p-4 shadow-sm bg-gray-50">
+      <div className="overflow-y-auto max-h-[550px] space-y-5 pr-3 
+                      scrollbar-thin scrollbar-thumb-indigo-300 scrollbar-track-transparent">
         {medicines.map((m) => {
           const reminderDue = isReminderDue(m);
           const highlight = highlighted[m._id];
 
           let cardStyle = "";
-          if (highlight === "taken") cardStyle = "bg-green-100 border-green-400 shadow-md";
-          else if (highlight === "missed") cardStyle = "bg-red-100 border-red-400 shadow-md";
-          else if (m._id === nextMedicineId) cardStyle = "bg-indigo-50 border-indigo-300 shadow-lg";
-          else cardStyle = "bg-white border-gray-100";
+          if (highlight === "taken")
+            cardStyle = "bg-green-50 border-green-400 scale-[1.02]";
+          else if (highlight === "missed")
+            cardStyle = "bg-red-50 border-red-400 scale-[1.02]";
+          else if (m._id === nextMedicineId)
+            cardStyle = "bg-indigo-50 border-indigo-300 scale-[1.01]";
+          else cardStyle = "bg-white/80 border-indigo-100";
 
           return (
             <div
               key={m._id}
-              className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border transition duration-300 ${cardStyle}`}
+              className={`rounded-2xl p-5 shadow-md border hover:shadow-xl 
+                         hover:bg-indigo-50/70 backdrop-blur-sm 
+                         transition-all duration-300 flex flex-col sm:flex-row 
+                         sm:items-center justify-between ${cardStyle}`}
             >
-              <div className="flex-1 text-center sm:text-left space-y-1">
-                <h3 className="text-lg font-semibold text-indigo-600">
+              <div>
+                <h3 className="text-xl font-semibold text-indigo-700">
                   {m.medicineName || m.name}
                 </h3>
-                <p className="text-gray-600">{m.dosage}</p>
-                <p className="text-gray-500 text-sm">{m.frequency}</p>
+                <p className="text-sm text-gray-700 mt-1">
+                  Dosage: <span className="font-medium">{m.dosage}</span>
+                </p>
+                <p className="text-sm text-gray-700">
+                  Frequency: <span className="font-medium">{m.frequency}</span>
+                </p>
               </div>
 
-              <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">
+              <div className="flex gap-3 mt-4 sm:mt-0 flex-wrap justify-center">
                 {reminderDue ? (
                   <>
                     <button
                       onClick={() => handleMarkTaken(m)}
-                      className="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded-full transition duration-200"
+                      className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl text-sm font-medium shadow transition-all duration-300 hover:scale-[1.05]"
                     >
-                      Mark as Taken
+                      ✅ Mark Taken
                     </button>
                     <button
                       onClick={() => handleMarkMissed(m)}
-                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full transition duration-200"
+                      className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-xl text-sm font-medium shadow transition-all duration-300 hover:scale-[1.05]"
                     >
-                      Mark as Missed
+                      ❌ Mark Missed
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => onEdit && onEdit(m)}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 rounded-full transition duration-200"
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-xl text-sm font-medium shadow transition-all duration-300 hover:scale-[1.05]"
                   >
-                    Edit
+                    ✏️ Edit
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(m._id)}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-full transition duration-200"
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-5 py-2 rounded-xl text-sm font-medium shadow transition-all duration-300 hover:scale-[1.05]"
                 >
-                  Delete
+                  🗑️ Delete
                 </button>
               </div>
             </div>

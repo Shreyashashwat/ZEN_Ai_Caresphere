@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from "react-route
 import Home from "./pages/HomePage";
 import Patient from "./pages/patient";
 import Header from "./components/Header";
-import ChatWidget from "./pages/ChatBot";
+import ChatWidget from "./pages/Chatbot.jsx";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 
