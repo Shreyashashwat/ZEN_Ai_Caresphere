@@ -38,6 +38,15 @@ const userSchema=new Schema({
       type: String,
       default: null,
     },
+       googleTokens: {
+    access_token: { type: String },
+    refresh_token: { type: String }, // optional, if you ever want offline access
+    expiry_date: { type: Number }
+},
+hasGoogleAccount: {
+  type: Boolean,
+  default: false,
+},
 
 },{
     timestamps:true,
