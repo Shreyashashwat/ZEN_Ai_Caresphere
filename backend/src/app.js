@@ -1,10 +1,18 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
-import userRouters from "./routes/user.routes.jsx"
-import medicineRoutes from"./src/routes/medicine.routes.js"
-import reminderRoutes from "./src/routes/reminder.routes.js"
+import userRouters from "./routes/user.routes.js"
+import medicineRoutes from"./routes/medicine.routes.js"
+import reminderRoutes from "./routes/reminder.routes.js"
+import chatbotRoute from "./routes/chatbot.routes.js"
+import saveNotificationToken from "./firebase/routes.js"
+import googleAuth from "./routes/googleapis.routes.js"
+import googleCalendarRoutes from "./routes/googleCalender.routes.js";
 
+import { sendnoti } from "./firebase/SendNotification.js"
+
+import dotenv from "dotenv";
+dotenv.config();
 
 const app=express()
 app.use(cors({
@@ -22,5 +30,11 @@ app.get("/test", (req, res) => {
 app.use('/api/v1/users',userRouters)
 app.use('/api/v1/medicine',medicineRoutes)
 app.use("/api/v1/reminder",reminderRoutes)
+app.use("/api/v1/chatbot",chatbotRoute);
+app.use("/api/v1/save-token",saveNotificationToken)
+app.use("/api/v1",googleAuth)
+app.use("/api/v1/google", googleCalendarRoutes);
+
+sendnoti()
 
 export default app

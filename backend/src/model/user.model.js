@@ -1,4 +1,5 @@
-import  mongoose ,{Schema} from "mongoose"
+import  mongoose from "mongoose"
+const {Schema}=mongoose
 import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
 
@@ -30,12 +31,22 @@ const userSchema=new Schema({
     },
     gender:{
         type:String,
-        enum:["male","female","others"],
+        enum:["Male","Female","Other"],
         required:true,
     },
-     refreshToken:{
-        type:String
-    }
+    fcmToken: {  
+      type: String,
+      default: null,
+    },
+       googleTokens: {
+    access_token: { type: String },
+    refresh_token: { type: String }, // optional, if you ever want offline access
+    expiry_date: { type: Number }
+},
+hasGoogleAccount: {
+  type: Boolean,
+  default: false,
+},
 
 },{
     timestamps:true,
@@ -51,38 +62,12 @@ userSchema.methods.isPasswordCorrect=async function (password) {
     return await bcrypt.compare(password,this.password)
     
 }
-userSchema.methods.getJwtToken = function () {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+userSchema.methods.generateToken = function () {
+  return jwt.sign(
+    { id: this._id, email: this.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 };
-userSchema.methods.generateAcessToken=function (){
-    return jwt.sign(
-        {
-            _id:this._id,
-            username:this.username,
-            fullName:this.fullName,
-            email:this.email
-
-        },
-        process.env.ACCESS_TOKEN_SECRET,
-        {
-           expiresIn: process.env.ACCESS_TOKEN_EXPIRY
-
- 
-        }
-    )
-}
-userSchema.methods.generateRefreshToken=function (){
-    return jwt.sign(
-        {
-            _id:this._id,
-            
-
-        },
-        process.env.REFRESH_TOKEN_SECRET,
-        {
-            expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
- 
-        }
-    )
-}
 export const User=mongoose.model("User",userSchema)

@@ -2,7 +2,7 @@ import mongoose ,{Schema}from 'mongoose';
 const calendarSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   eventId: { type: String },
-  medicationId: { type: mongoose.Schema.Types.ObjectId, ref: "Medication" },
+  medicineId: { type: mongoose.Schema.Types.ObjectId, ref: "Medicine" },
   accessToken: { type: String },
   refreshToken: { type: String },
   expiryDate: { type: Date }
