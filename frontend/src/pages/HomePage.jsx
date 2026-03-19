@@ -1,7 +1,6 @@
-import React, { useState,useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser, registerUser } from "../api";
-
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -14,7 +13,6 @@ const HomePage = () => {
     age: 0,
     gender: "",
   });
-   
 
   const clearForms = () => {
     setLoginData({ email: "", password: "" });
@@ -23,7 +21,7 @@ const HomePage = () => {
 
   const handleToggle = (isLogin) => {
     setShowLogin(isLogin);
-    clearForms(); 
+    clearForms();
   };
 
   const handleLoginChange = (e) =>
@@ -32,21 +30,32 @@ const HomePage = () => {
   const handleRegisterChange = (e) =>
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
 
-const handleLoginSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const res = await loginUser(loginData);
-    console.log("Login success:", res.data);
-
+  // ------------------- Updated Login Submit -------------------
   
+const handleLoginSubmit = async (e) => {
+  e.preventDefault();  // Prevent default form submit
+  // log current form state
+
+  try {
+    // Send loginData (email & password) to backend
+    const res = await loginUser(loginData);  
+
     const { user, token } = res.data.data;
 
+
+    // Save user info and token locally
     localStorage.setItem(
       "user",
-      JSON.stringify({ _id: user._id, username: user.username,token })
+      JSON.stringify({ _id: user._id, username: user.username, token })
     );
 
-    alert("Login successful!");
+    // Redirect to Google OAuth if not connected
+    if (!user.hasGoogleAccount) {
+      window.location.href = `http://localhost:8000/api/v1/auth/google?token=${token}`;
+      return;
+    }
+
+    // Navigate to patient page if already connected
     navigate("/patient");
   } catch (error) {
     console.error("Login error:", error);
@@ -54,15 +63,11 @@ const handleLoginSubmit = async (e) => {
   }
 };
 
-
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     try {
       const res = await registerUser(registerData);
-      console.log("Registration success:", res.data);
-      alert("Registration successful!");
-
-      
+      alert("Registration successful! Please login.");
       handleToggle(true);
     } catch (error) {
       console.error("Register error:", error);
@@ -70,15 +75,13 @@ const handleLoginSubmit = async (e) => {
     }
   };
 
+  // ------------------- JSX -------------------
   return (
     <div
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
-      style={{
-        backgroundImage: "url('/medical-technology-icon-set-health-wellness.jpg')",
-      }}
+      style={{ backgroundImage: "url('/medical-technology-icon-set-health-wellness.jpg')" }}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-xs"></div>
-
       <div className="relative z-10 flex flex-col items-center px-4">
         <h1 className="text-5xl sm:text-6xl font-extrabold text-white mb-6 drop-shadow-lg">
           Care<span className="text-blue-300">Sphere</span>
@@ -92,9 +95,7 @@ const handleLoginSubmit = async (e) => {
             <button
               onClick={() => handleToggle(true)}
               className={`px-6 py-2 rounded-full font-semibold transition ${
-                showLogin
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "text-gray-700 hover:text-blue-600"
+                showLogin ? "bg-blue-600 text-white shadow-md" : "text-gray-700 hover:text-blue-600"
               }`}
             >
               Login
@@ -102,9 +103,7 @@ const handleLoginSubmit = async (e) => {
             <button
               onClick={() => handleToggle(false)}
               className={`px-6 py-2 rounded-full font-semibold transition ${
-                !showLogin
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "text-gray-700 hover:text-blue-600"
+                !showLogin ? "bg-blue-600 text-white shadow-md" : "text-gray-700 hover:text-blue-600"
               }`}
             >
               Register
@@ -131,7 +130,7 @@ const handleLoginSubmit = async (e) => {
                 required
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
               />
-              <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow shadow-md">
+              <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow shadow-md">
                 Login
               </button>
             </form>
@@ -189,7 +188,7 @@ const handleLoginSubmit = async (e) => {
                 </select>
               </div>
 
-              <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow shadow-md">
+              <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow shadow-md">
                 Register
               </button>
             </form>

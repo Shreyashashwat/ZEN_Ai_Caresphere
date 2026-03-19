@@ -13,6 +13,10 @@ import Messaging from "./Firebase/Messaging.jsx";
 import { onMessage } from "firebase/messaging";
 import { messaging } from "./Firebase/firebase";
 
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import MedicineReminderToast from "./components/MedicineReminderToast";
+
 function ChatbotWrapper() {
   const location = useLocation();
   const { user, token } = useContext(UserContext);
@@ -21,12 +25,17 @@ function ChatbotWrapper() {
     if (location.pathname !== "/patient") return;
 
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground message received:", payload);
-      if (Notification.permission === "granted" && payload.notification) {
-        new Notification(payload.notification.title, {
-          body: payload.notification.body,
-        });
-      }
+      console.log("Foreground FCM message received:", payload);
+
+      // Use data payload from backend (data-only message)
+      const { title, body, medicineId } = payload.data || {};
+
+      if (!medicineId) return; // skip invalid messages
+
+      toast.info(
+        <MedicineReminderToast title={title || "💊 Medicine Reminder"} body={body || ""} medicineId={medicineId} />,
+        { autoClose: false, closeOnClick: false }
+      );
     });
 
     return () => unsubscribe();
@@ -35,7 +44,11 @@ function ChatbotWrapper() {
   if (location.pathname !== "/patient") return null;
 
   if (!user || !token) {
-    return <p className="text-center text-red-500 mt-4">Please log in to use the chatbot.</p>;
+    return (
+      <p className="text-center text-red-500 mt-4">
+        Please log in to use the chatbot.
+      </p>
+    );
   }
 
   return <ChatWidget userId={user._id} authToken={token} />;
@@ -46,7 +59,7 @@ function App() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/firebase-messaging-sw.js")
-        .then((reg) => console.log("SW registered:", reg))
+        .then((reg) => console.log("Service Worker registered:", reg))
         .catch((err) => console.error("SW registration failed:", err));
     }
   }, []);
@@ -55,14 +68,15 @@ function App() {
     <UserProvider>
       <Router>
         <Header />
-        <Messaging /> 
+        <Messaging /> {/* Requests notification permission */}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
         </Routes>
-        <ChatbotWrapper />
+        <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
+        <ToastContainer position="top-right" />
       </Router>
     </UserProvider>
   );
