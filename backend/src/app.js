@@ -6,6 +6,7 @@ import medicineRoutes from"./routes/medicine.routes.js"
 import reminderRoutes from "./routes/reminder.routes.js"
 import chatbotRoute from "./routes/chatbot.routes.js"
 import saveNotificationToken from "./firebase/routes.js"
+import googleAuth from "./routes/googleapis.routes.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -28,5 +29,5 @@ app.use('/api/v1/medicine',medicineRoutes)
 app.use("/api/v1/reminder",reminderRoutes)
 app.use("/api/v1/chatbot",chatbotRoute);
 app.use("/api/v1/save-token",saveNotificationToken)
-
+app.use("/api/v1",googleAuth)
 export default app
