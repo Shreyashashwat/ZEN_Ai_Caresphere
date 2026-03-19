@@ -7,5 +7,6 @@ const reminderStatusSchema = new mongoose.Schema({
   time: { type: Date, required: true },
   status: { type: String, enum: ["pending", "taken", "missed"], default: "pending" },
   userResponseTime: { type: Date },
+  eventId: { type: String },
 });
 export const Reminder=mongoose.model("Reminder",reminderStatusSchema)

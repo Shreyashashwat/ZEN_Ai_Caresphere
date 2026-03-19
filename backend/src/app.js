@@ -7,6 +7,9 @@ import reminderRoutes from "./routes/reminder.routes.js"
 import chatbotRoute from "./routes/chatbot.routes.js"
 import saveNotificationToken from "./firebase/routes.js"
 import googleAuth from "./routes/googleapis.routes.js"
+import googleCalendarRoutes from "./routes/googleCalender.routes.js";
+
+import { sendnoti } from "./firebase/SendNotification.js"
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -30,4 +33,8 @@ app.use("/api/v1/reminder",reminderRoutes)
 app.use("/api/v1/chatbot",chatbotRoute);
 app.use("/api/v1/save-token",saveNotificationToken)
 app.use("/api/v1",googleAuth)
+app.use("/api/v1/google", googleCalendarRoutes);
+
+sendnoti()
+
 export default app
