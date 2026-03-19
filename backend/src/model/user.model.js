@@ -1,4 +1,5 @@
-import  mongoose ,{Schema} from "mongoose"
+import  mongoose from "mongoose"
+const {Schema}=mongoose
 import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
 
@@ -30,10 +31,13 @@ const userSchema=new Schema({
     },
     gender:{
         type:String,
-         enum:["Male","Female","Other"],
+        enum:["Male","Female","Other"],
         required:true,
     },
-    
+    fcmToken: {  
+      type: String,
+      default: null,
+    },
 
 },{
     timestamps:true,
@@ -49,12 +53,10 @@ userSchema.methods.isPasswordCorrect=async function (password) {
     return await bcrypt.compare(password,this.password)
     
 }
-userSchema.methods.getJwtToken = function () {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-};
+
 userSchema.methods.generateToken = function () {
   return jwt.sign(
-     { id: this._id, email: this.email },
+    { id: this._id, email: this.email },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );

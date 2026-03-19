@@ -1,24 +1,42 @@
-
+// frontend/firebase/requestPermission.js
 import { getToken } from "firebase/messaging";
-import { messaging } from "./firebase";
+import { messaging } from "./firebase"; // your firebase config file
 import axios from "axios";
 
 export const requestPermission = async (userId) => {
   console.log("Requesting notification permission...");
 
-  const permission = await Notification.requestPermission();
-  if (permission === "granted") {
+  try {
+    const permission = await Notification.requestPermission();
+
+    if (permission !== "granted") {
+      console.warn("Notification permission denied");
+      return;
+    }
+
     const token = await getToken(messaging, {
-      vapidKey: "BJ2KvLbvU3ihA_WFNrclOR8Cg-rlBWJNweT8VPEPkmch0B_pGheoKvVjiv_Z3n42qwAqoqW7s9rm90nITyjkvCY",
+      vapidKey: "BG8L7pkVGe7RpMdpDSuJd4IR-_QDh0D6Xllb9UIRgcpoeUBXhqhyRL-V2mkWLzDKMcUT24eha-BujuJm7IA4Ia0",
     });
+
+    if (!token) {
+      console.error("Failed to get FCM token from Firebase");
+      return;
+    }
 
     console.log("FCM Token:", token);
 
-    await axios.post("http://localhost:8000/api/v1/save-token", {
+    // Send token to backend
+    const response = await axios.post("http://localhost:8000/api/v1/save-token", {
       userId,
       token,
     });
-  } else {
-    console.warn("Notification permission denied");
+
+    if (response.data.success) {
+      console.log("✅ Token saved successfully:", response.data.data.fcmToken);
+    } else {
+      console.warn("❌ Failed to save token:", response.data.message);
+    }
+  } catch (err) {
+    console.error("Error in requestPermission:", err);
   }
 };

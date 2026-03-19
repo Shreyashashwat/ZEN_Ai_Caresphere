@@ -8,12 +8,7 @@ function Messaging() {
     requestPermission(userId);
   }, []);
 
-  return (
-    <div>
-      <h1>CareSphere Notifications 🔔</h1>
-      <p>You'll receive reminders when they are scheduled.</p>
-    </div>
-  );
+  return null; 
 }
 
 export default Messaging;
