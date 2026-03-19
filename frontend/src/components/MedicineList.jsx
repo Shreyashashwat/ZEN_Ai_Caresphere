@@ -3,17 +3,12 @@ import { markasTaken, markasMissed, deleteMedicine } from "../api";
 
 const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
   const [tick, setTick] = useState(0);
+  const [highlighted, setHighlighted] = useState({}); // Track temporary highlights
 
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 30000); // re-render every 30s
+    const interval = setInterval(() => setTick((t) => t + 1), 30000); // Re-render every 30s
     return () => clearInterval(interval);
   }, []);
-
-  const statusColors = {
-    Taken: "bg-green-100 text-green-800",
-    Missed: "bg-red-100 text-red-800",
-    Pending: "bg-yellow-100 text-yellow-800",
-  };
 
   const getNextMedicineId = () => {
     const now = new Date();
@@ -58,8 +53,16 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
           reminderTime <= new Date()
         );
       });
+
       if (reminder) {
         await markasTaken(reminder._id);
+
+        // Temporarily highlight green
+        setHighlighted((prev) => ({ ...prev, [medicine._id]: "taken" }));
+        setTimeout(() => {
+          setHighlighted((prev) => ({ ...prev, [medicine._id]: null }));
+        }, 3000);
+
         onUpdate();
       }
     } catch (err) {
@@ -79,8 +82,16 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
           reminderTime <= new Date()
         );
       });
+
       if (reminder) {
         await markasMissed(reminder._id);
+
+        // Temporarily highlight red
+        setHighlighted((prev) => ({ ...prev, [medicine._id]: "missed" }));
+        setTimeout(() => {
+          setHighlighted((prev) => ({ ...prev, [medicine._id]: null }));
+        }, 3000);
+
         onUpdate();
       }
     } catch (err) {
@@ -89,17 +100,16 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     }
   };
 
-const handleDelete = async (id) => {
-  if (!window.confirm("Are you sure you want to delete this medicine?")) return;
-  try {
-    await deleteMedicine(id);
-    onUpdate();
-  } catch (err) {
-    console.error(err);
-    alert("Failed to delete medicine.");
-  }
-};
-
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+    try {
+      await deleteMedicine(id);
+      onUpdate();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete medicine.");
+    }
+  };
 
   if (!medicines || medicines.length === 0)
     return <p className="text-gray-500 text-center mt-10">No medicines added yet.</p>;
@@ -115,15 +125,18 @@ const handleDelete = async (id) => {
       <div className="max-h-96 overflow-y-auto pr-2 scroll-smooth space-y-4 mt-4 border border-gray-200 rounded-2xl p-4 shadow-sm bg-gray-50">
         {medicines.map((m) => {
           const reminderDue = isReminderDue(m);
+          const highlight = highlighted[m._id];
+
+          let cardStyle = "";
+          if (highlight === "taken") cardStyle = "bg-green-100 border-green-400 shadow-md";
+          else if (highlight === "missed") cardStyle = "bg-red-100 border-red-400 shadow-md";
+          else if (m._id === nextMedicineId) cardStyle = "bg-indigo-50 border-indigo-300 shadow-lg";
+          else cardStyle = "bg-white border-gray-100";
 
           return (
             <div
               key={m._id}
-              className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border ${
-                m._id === nextMedicineId
-                  ? "bg-indigo-50 border-indigo-300 shadow-lg"
-                  : "bg-white border-gray-100"
-              } hover:shadow-xl transition duration-200`}
+              className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border transition duration-300 ${cardStyle}`}
             >
               <div className="flex-1 text-center sm:text-left space-y-1">
                 <h3 className="text-lg font-semibold text-indigo-600">
@@ -131,16 +144,6 @@ const handleDelete = async (id) => {
                 </h3>
                 <p className="text-gray-600">{m.dosage}</p>
                 <p className="text-gray-500 text-sm">{m.frequency}</p>
-              </div>
-
-              <div className="mt-3 sm:mt-0">
-                <span
-                  className={`px-3 py-1 rounded-full font-semibold ${
-                    statusColors[m.status] || "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {m.status || "Pending"}
-                </span>
               </div>
 
               <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">

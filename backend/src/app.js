@@ -1,15 +1,14 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
-import userRouters from "./routes/user.routes.jsx"
+import userRouters from "./routes/user.routes.js"
 import medicineRoutes from"./routes/medicine.routes.js"
 import reminderRoutes from "./routes/reminder.routes.js"
 import chatbotRoute from "./routes/chatbot.routes.js"
-import mlRoutes from "./routes/ml.routes.js"
+import saveNotificationToken from "./firebase/routes.js"
 
 import dotenv from "dotenv";
 dotenv.config();
-
 
 const app=express()
 app.use(cors({
@@ -28,7 +27,6 @@ app.use('/api/v1/users',userRouters)
 app.use('/api/v1/medicine',medicineRoutes)
 app.use("/api/v1/reminder",reminderRoutes)
 app.use("/api/v1/chatbot",chatbotRoute);
-app.use("/api", mlRoutes);
-
+app.use("/api/v1/save-token",saveNotificationToken)
 
 export default app
