@@ -3,13 +3,12 @@ import axios from "axios";
 const API = axios.create({
   baseURL: "http://localhost:8000/api/v1",
 
-
 });
 
 API.interceptors.request.use((req) => {
   const user = localStorage.getItem("user");
   if (user) {
-     const parsed = JSON.parse(user);
+    const parsed = JSON.parse(user);
     const token = parsed.data ? parsed.data.token : parsed.token;
     if (token) req.headers.Authorization = `Bearer ${token}`;
   }

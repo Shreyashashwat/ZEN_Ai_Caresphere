@@ -28,7 +28,7 @@ const DashboardChart = ({ refreshTrigger }) => {
     }
   };
 
-  // Refetch whenever refreshTrigger changes
+
   useEffect(() => {
     fetchStats();
   }, [refreshTrigger]);

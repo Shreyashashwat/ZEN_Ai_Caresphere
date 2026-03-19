@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { addMedicine, updateMedicine, addReminder } from "../api";
+
 const MedicineForm = ({ onSuccess, medicine }) => {
   const [formData, setFormData] = useState({
     medicineName: "",
@@ -74,53 +75,6 @@ const MedicineForm = ({ onSuccess, medicine }) => {
         medicineId = res.data.data._id;
         alert("Medicine added successfully!");
 
-        // 2) Add reminders for each time
-        for (const t of formData.time) {
-          const start = new Date(formData.startDate);
-          const end = formData.endDate ? new Date(formData.endDate) : start;
-
-          const step =
-            formData.frequency === "daily"
-              ? 1
-              : formData.frequency === "weekly"
-              ? 7
-              : 0;
-
-          for (
-            let d = new Date(start);
-            step > 0 && d <= end;
-            d.setDate(d.getDate() + step)
-          ) {
-            const [hours, minutes] = t.split(":");
-            const reminderTime = new Date(d);
-            reminderTime.setHours(hours, minutes, 0, 0);
-
-            await addReminder({ medicineId, time: reminderTime.toISOString() });
-          }
-
-          // For "as needed", create one reminder per selected time
-          if (formData.frequency === "as needed") {
-            const [hours, minutes] = t.split(":");
-            const reminderTime = new Date(start);
-            reminderTime.setHours(hours, minutes, 0, 0);
-
-            await addReminder({
-              medicineId,
-              time: reminderTime.toISOString(),
-            });
-          }
-        }
-      }
-
-      if (isEditing) {
-        const res = await updateMedicine(medicine._id, medicineData);
-        medicineId = res.data.data._id;
-        alert("Medicine updated successfully!");
-      } else {
-        const res = await addMedicine(medicineData);
-        medicineId = res.data.data._id;
-        alert("Medicine added successfully!");
-
         // Add reminders only for new medicine
         for (const t of formData.time) {
           const start = new Date(formData.startDate);
@@ -176,7 +130,7 @@ const MedicineForm = ({ onSuccess, medicine }) => {
       className="max-w-lg mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-5"
     >
       <h2 className="text-2xl font-semibold text-gray-700 text-center">
-       {isEditing ? "Update Medicine" : "Add Medicine"}
+        {isEditing ? "Update Medicine" : "Add Medicine"}
       </h2>
 
       <input
@@ -273,7 +227,7 @@ const MedicineForm = ({ onSuccess, medicine }) => {
           loading ? "opacity-60 cursor-not-allowed" : ""
         }`}
       >
-         {loading
+        {loading
           ? "Saving..."
           : isEditing
           ? "Update Medicine"

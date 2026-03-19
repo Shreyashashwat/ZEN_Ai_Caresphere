@@ -11,11 +11,11 @@ const CalendarView = ({ reminders = [] }) => {
     reminders.forEach((r) => {
       if (!r.time || !r.status) return;
       const dateKey = new Date(r.time).toISOString().split("T")[0];
-      const status = r.status.toLowerCase(); // backend status is lowercase
+      const status = r.status.toLowerCase();
 
-      // Prioritize: missed > pending > taken
+     
       if (!data[dateKey]) {
-        data[dateKey] = status;
+        data[dateKey] = status === "pending" ? "upcoming" : status;
       } else if (status === "missed") {
         data[dateKey] = "missed";
       } else if (status === "pending" && data[dateKey] !== "missed") {
@@ -33,7 +33,7 @@ const CalendarView = ({ reminders = [] }) => {
       const status = calendarData[key];
       if (status === "taken") return "bg-green-200 rounded-full";
       if (status === "missed") return "bg-red-200 rounded-full";
-      if (status === "upcoming") return "bg-pink-200 rounded-full"; // match legend
+      if (status === "upcoming") return "bg-pink-200 rounded-full";
     }
     return "";
   };
