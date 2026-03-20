@@ -11,6 +11,7 @@ function ChatWidget() {
   const userId = storedUser?._id;
   const authToken = storedUser?.token;
 
+ 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -58,8 +59,8 @@ function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
-      {/* Floating Chat Button */}
+    <div className="fixed bottom-4 right-4">
+  
       <button
         onClick={toggleChat}
         className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transform transition-all duration-300"

@@ -10,6 +10,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     const interval = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(interval);
   }, []);
+  
 
   // Auto-mark missed reminders
   useEffect(() => {
@@ -144,28 +145,21 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
         💊 Medicine List
       </h2>
 
-      <div className="overflow-y-auto max-h-[550px] space-y-5 pr-3 
-                      scrollbar-thin scrollbar-thumb-indigo-300 scrollbar-track-transparent">
+      <div className="max-h-96 overflow-y-auto pr-2 scroll-smooth space-y-4 mt-4 border border-gray-200 rounded-2xl p-4 shadow-sm bg-gray-50">
         {medicines.map((m) => {
           const reminderDue = isReminderDue(m);
           const highlight = highlighted[m._id];
 
           let cardStyle = "";
-          if (highlight === "taken")
-            cardStyle = "bg-green-50 border-green-400 scale-[1.02]";
-          else if (highlight === "missed")
-            cardStyle = "bg-red-50 border-red-400 scale-[1.02]";
-          else if (m._id === nextMedicineId)
-            cardStyle = "bg-indigo-50 border-indigo-300 scale-[1.01]";
-          else cardStyle = "bg-white/80 border-indigo-100";
+          if (highlight === "taken") cardStyle = "bg-green-100 border-green-400 shadow-md";
+          else if (highlight === "missed") cardStyle = "bg-red-100 border-red-400 shadow-md";
+          else if (m._id === nextMedicineId) cardStyle = "bg-indigo-50 border-indigo-300 shadow-lg";
+          else cardStyle = "bg-white border-gray-100";
 
           return (
             <div
               key={m._id}
-              className={`rounded-2xl p-5 shadow-md border hover:shadow-xl 
-                         hover:bg-indigo-50/70 backdrop-blur-sm 
-                         transition-all duration-300 flex flex-col sm:flex-row 
-                         sm:items-center justify-between ${cardStyle}`}
+              className={`flex flex-col sm:flex-row items-center justify-between p-4 rounded-2xl shadow border transition duration-300 ${cardStyle}`}
             >
               <div>
                 <h3 className="text-xl font-semibold text-indigo-700">
@@ -179,7 +173,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
                 </p>
               </div>
 
-              <div className="flex gap-3 mt-4 sm:mt-0 flex-wrap justify-center">
+              <div className="mt-3 sm:mt-0 flex flex-wrap gap-2 justify-center">
                 {reminderDue ? (
                   <>
                     <button
