@@ -35,23 +35,20 @@ const addMedicine = asyncHandler(async (req, res) => {
     repeat: repeat || "daily",
   });
   const calendarData = await Calendar.findOne({ userId });
-  console.log(userId);
-  console.log("yescalender");
-  console.log(calendarData);
-  
+
   const googleEventIds = [];
   if (calendarData) {
-    const start= new Date(medicine.startDate);
-const end = medicine.endDate ? new Date(medicine.endDate) : new Date(start);
-   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-  for (const t of medicine.time) {
-    const doseTime = new Date(`${d.toISOString().split("T")[0]}T${t}:00`);
-    const eventId = await addMedicineToGoogleCalendar(calendarData, medicine, doseTime);
-    googleEventIds.push(eventId);
-  }
-}
-     medicine.googleEventIds = googleEventIds;
-await medicine.save();
+    const start = new Date(medicine.startDate);
+    const end = medicine.endDate ? new Date(medicine.endDate) : new Date(start);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      for (const t of medicine.time) {
+        const doseTime = new Date(`${d.toISOString().split("T")[0]}T${t}:00`);
+        const eventId = await addMedicineToGoogleCalendar(calendarData, medicine, doseTime);
+        googleEventIds.push(eventId);
+      }
+    }
+    medicine.googleEventIds = googleEventIds;
+    await medicine.save();
   }
 
   return res.status(201).json(new ApiResponse(201, medicine, "Medicine added successfully"));
@@ -61,40 +58,35 @@ await medicine.save();
 const updateMedicine = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  console.log(`userID:${req.user}`);
   if (!userId) throw new ApiError(400, "User ID missing");
 
-  const updateData = req.body; 
+  const updateData = req.body;
 
   const medicine = await Medicine.findOneAndUpdate(
     { _id: id, userId },
     updateData,
     { new: true }
   );
-  console.log("userId")
-  console.log(userId)
 
   if (!medicine) throw new ApiError(404, "Medicine not found or not authorized");
-  console.log("10000000000")
- 
-   const calendarData = await Calendar.findOne({  userId: new mongoose.Types.ObjectId(userId) });
-   console.log(calendarData)
 
-   const googleEventIds = [];
+  const calendarData = await Calendar.findOne({ userId });
+
+  const googleEventIds = [];
   if (calendarData && updateData.time) {
     // Delete previous events or update them (optional)
     // Then add new times as events
-      const start= new Date(medicine.startDate);
-const end = medicine.endDate ? new Date(medicine.endDate) : new Date(start);
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-  for (const t of medicine.time) {
-    const doseTime = new Date(`${d.toISOString().split("T")[0]}T${t}:00`);
-    const eventId = await addMedicineToGoogleCalendar(calendarData, medicine, doseTime);
-    googleEventIds.push(eventId);
-  }
-}
-     medicine.googleEventIds = googleEventIds;
-await medicine.save();
+    const start = new Date(medicine.startDate);
+    const end = medicine.endDate ? new Date(medicine.endDate) : new Date(start);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      for (const t of medicine.time) {
+        const doseTime = new Date(`${d.toISOString().split("T")[0]}T${t}:00`);
+        const eventId = await addMedicineToGoogleCalendar(calendarData, medicine, doseTime);
+        googleEventIds.push(eventId);
+      }
+    }
+    medicine.googleEventIds = googleEventIds;
+    await medicine.save();
   }
 
   return res.status(200).json(new ApiResponse(200, medicine, "Medicine updated successfully"));

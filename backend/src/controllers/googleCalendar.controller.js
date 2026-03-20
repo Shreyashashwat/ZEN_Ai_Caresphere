@@ -7,7 +7,7 @@ import { Reminder } from "../model/reminderstatus.js";
 
 export const getWebsiteGoogleEvents = async (req, res) => {
   try {
-    const userId = req.user;
+    const userId = req.user.id;
 
     // 1️⃣ Find user's calendar tokens
     const calendarData = await Calendar.findOne({ userId });
