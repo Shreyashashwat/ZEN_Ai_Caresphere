@@ -25,6 +25,9 @@ function ChatWidget() {
     setInputText("");
 
     try {
+   
+      console.log("Sending message with token:", authToken);
+
       const resp = await axios.post(
         "http://localhost:8000/api/v1/chatbot",
         { userId, message: inputText },
@@ -64,7 +67,7 @@ function ChatWidget() {
         {isOpen ? "✖" : "💬"}
       </button>
 
-      {/* Chat Window */}
+  
       {isOpen && (
         <div className="mt-3 w-80 sm:w-96 h-[480px] bg-white shadow-2xl rounded-2xl flex flex-col overflow-hidden border border-gray-200 animate-fadeIn">
           {/* Header */}
