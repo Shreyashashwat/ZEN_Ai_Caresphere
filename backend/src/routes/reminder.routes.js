@@ -16,4 +16,7 @@ router.post('/', verifyJwt,addReminder);
 router.put('/:id', verifyJwt,updateReminderStatus);
 router.delete('/:id',verifyJwt, deleteReminder);
 
+router.route("/taken/:reminderId").patch(verifyJwt,markasTaken)
+router.route("/missed/:reminderId").patch(verifyJwt,markasMissed)
+
 export default router;
