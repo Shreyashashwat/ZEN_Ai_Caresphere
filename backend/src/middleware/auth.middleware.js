@@ -7,7 +7,12 @@ export const verifyJwt = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded._id;
+    // Support both 'id' (from user model method) and '_id' (from login controller)
+    req.user = {
+      id: decoded.id || decoded._id,
+      email: decoded.email,
+      role: decoded.role,
+    };
     console.log("Decoded token:", decoded);
     next();
   } catch (error) {

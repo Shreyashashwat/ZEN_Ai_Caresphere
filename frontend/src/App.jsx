@@ -13,9 +13,12 @@ import Messaging from "./Firebase/Messaging.jsx";
 import { onMessage } from "firebase/messaging";
 import { messaging } from "./Firebase/firebase";
 
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import MedicineReminderToast from "./components/MedicineReminderToast";
+function HeaderWrapper() {
+  const location = useLocation();
+  // Hide global header on specific paths
+  if (location.pathname === "/caregiver-dashboard") return null;
+  return <Header />;
+}
 
 function ChatbotWrapper() {
   const location = useLocation();
@@ -25,17 +28,12 @@ function ChatbotWrapper() {
     if (location.pathname !== "/patient") return;
 
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground FCM message received:", payload);
-
-      // Use data payload from backend (data-only message)
-      const { title, body, medicineId } = payload.data || {};
-
-      if (!medicineId) return; // skip invalid messages
-
-      toast.info(
-        <MedicineReminderToast title={title || "💊 Medicine Reminder"} body={body || ""} medicineId={medicineId} />,
-        { autoClose: false, closeOnClick: false }
-      );
+      console.log("Foreground message received:", payload);
+      if (Notification.permission === "granted" && payload.notification) {
+        new Notification(payload.notification.title, {
+          body: payload.notification.body,
+        });
+      }
     });
 
     return () => unsubscribe();
@@ -59,7 +57,7 @@ function App() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/firebase-messaging-sw.js")
-        .then((reg) => console.log("Service Worker registered:", reg))
+        .then((reg) => console.log("SW registered:", reg))
         .catch((err) => console.error("SW registration failed:", err));
     }
   }, []);
@@ -67,20 +65,16 @@ function App() {
   return (
     <UserProvider>
       <Router>
-        <Header />
+        <HeaderWrapper />
         <Messaging /> {/* Requests notification permission */}
         <Routes>
           <Route path="/" element={<Home />} />
+
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
         </Routes>
-<<<<<<< HEAD
-        <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
-        <ToastContainer position="top-right" />
-=======
-        <ChatbotWrapper /> 
->>>>>>> origin/advance-feature
+        <ChatbotWrapper /> {/* Foreground notifications */}
       </Router>
     </UserProvider>
   );

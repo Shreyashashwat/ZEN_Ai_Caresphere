@@ -10,7 +10,7 @@ import mongoose from "mongoose";
 
 
 const getMedicines = asyncHandler(async (req, res) => {
-  const userId = req.user;
+  const userId = req.user.id;
   if (!userId) throw new ApiError(400, "User ID missing");
 
   const medicines = await Medicine.find({ userId });
@@ -19,7 +19,7 @@ const getMedicines = asyncHandler(async (req, res) => {
 });
 
 const addMedicine = asyncHandler(async (req, res) => {
-  const userId = req.user; 
+  const userId = req.user.id;
   if (!userId) throw new ApiError(400, "Invalid user");
 
   const { medicineName, dosage, frequency, time, startDate, endDate, repeat } = req.body;
@@ -60,7 +60,7 @@ await medicine.save();
 
 const updateMedicine = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const userId = req.user;
+  const userId = req.user.id;
   console.log(`userID:${req.user}`);
   if (!userId) throw new ApiError(400, "User ID missing");
 
