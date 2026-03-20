@@ -4,56 +4,50 @@ import { Reminder } from "../model/reminderstatus.js";
 import { Medicine } from "../model/medicine.model.js";
 import { handleMissedReminder } from "../controllers/reminder.controller.js";
 
-/** 🔔 Send FCM notification */
+/* 🔔 Send DATA-ONLY FCM */
 async function sendNotification(token, medicine) {
   const message = {
+    token,
     data: {
-      title: `💊 Medicine Reminder`,
+      title: "💊 Medicine Reminder",
       body: `Time to take your medicine: ${medicine.medicineName} (${medicine.dosage})`,
       medicineId: medicine._id.toString(),
     },
-    token,
   };
 
-  try {
-    await admin.messaging().send(message);
-    console.log(`✅ Notification sent`);
-  } catch (err) {
-    console.error("❌ Error sending notification:", err);
-  }
+  await admin.messaging().send(message);
 }
 
-/** 🕒 Minute Cron: ONLY sends notifications for existing reminders */
+/* 🕒 Minute Cron */
 const sendnoti = () => {
   cron.schedule("* * * * *", async () => {
-    console.log("⏰ Notification cron triggered:", new Date().toLocaleString());
+    const now = new Date();
 
     try {
-      const now = new Date();
-      const windowStart = new Date(now.getTime() - 60 * 1000);
-      const windowEnd = new Date(now.getTime() + 60 * 1000);
-
-      // 🔎 Find reminders due now
+      /* 🔔 SEND REMINDERS (ONLY ONCE) */
       const reminders = await Reminder.find({
         status: "pending",
-        time: { $gte: windowStart, $lte: windowEnd },
+        notified: false,               // 🔥 KEY FIX
+        time: { $lte: now },
       }).populate("medicineId userId");
 
       for (const reminder of reminders) {
         const user = reminder.userId;
         const medicine = reminder.medicineId;
 
-        if (!user || !user.fcmToken || !medicine) continue;
+        if (!user?.fcmToken || !medicine) continue;
 
-        // 🔔 Send notification
         await sendNotification(user.fcmToken, medicine);
 
+        reminder.notified = true;     // 🔒 LOCK notification
+        await reminder.save();
+
         console.log(
-          `🔔 Reminder notified: ${medicine.medicineName} for user ${user._id}`
+          `🔔 Notified reminder ${reminder._id} (${medicine.medicineName})`
         );
       }
 
-      // ⚠️ Handle missed reminders (>30 minutes late)
+      /* ⚠️ HANDLE MISSED REMINDERS (ONCE) */
       const lateReminders = await Reminder.find({
         status: "pending",
         processedMissed: false,
@@ -61,19 +55,22 @@ const sendnoti = () => {
       });
 
       for (const reminder of lateReminders) {
-        const medicine = await Medicine.findById(reminder.medicineId);
         reminder.processedMissed = true;
+        reminder.status = "missed";
+
+        const medicine = await Medicine.findById(reminder.medicineId);
         if (medicine) {
           medicine.missedCount += 1;
           await medicine.save();
         }
 
+        await reminder.save();
         await handleMissedReminder(reminder._id);
 
-        console.log(`⚠️ Marked as missed reminder ${reminder._id}`);
+        console.log(`⚠️ Marked missed: ${reminder._id}`);
       }
     } catch (err) {
-      console.error("❌ Error in notification cron:", err);
+      console.error("❌ Notification cron error:", err);
     }
   });
 
