@@ -6,6 +6,10 @@ import MedicineForm from "../components/MedicineForm";
 import HistoryTable from "../components/HistoryTable";
 import CalendarView from "../components/CalendarView";
 import DashboardChart from "../components/DashboardChart";
+import CaregiverList from "../components/CaregiverList";
+import AlertsView from "../components/Caregiver/AlertsView";
+import PatientsView from "../components/Caregiver/PatientsView";
+import PatientDetailModal from "../components/Caregiver/PatientDetailModal";
 import { getMedicines, fetchHistory, getReminders, deleteMedicine } from "../api";
 
 const Patient = () => {
@@ -15,6 +19,8 @@ const Patient = () => {
   const [reminders, setReminders] = useState([]);
   const [nextReminder, setNextReminder] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [activeTab, setActiveTab] = useState('health');
   const navigate = useNavigate();
 
   // Fetch Data
@@ -73,7 +79,7 @@ const Patient = () => {
     setNextReminder(upcoming || null);
   }, [reminders]);
 
-  // Initial fetch
+  // Initial load
   useEffect(() => {
     fetchMedicines();
     fetchHistoryData();
@@ -111,82 +117,129 @@ const Patient = () => {
         </div>
       </header>
 
-      {/* 🩺 Welcome Section */}
-      <section className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-none sm:rounded-3xl p-8 shadow-lg mt-6 mx-6">
+      {/* 🩺 Welcome Section with Toggle */}
+      <section className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-none sm:rounded-3xl p-8 shadow-lg mt-6 mx-6 transition-all duration-300">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-          <div>
+          <div className="flex-1">
             <h2 className="text-3xl font-semibold mb-2">
               Welcome back, <span className="font-bold">{username} 👋</span>
             </h2>
-            <p className="text-white/90 text-sm sm:text-base">
-              Here’s your personalized health dashboard.
-            </p>
+            <div className="flex items-center gap-4 mt-4">
+              <button
+                onClick={() => setActiveTab('health')}
+                className={`px-5 py-2 rounded-full font-semibold transition-all duration-300 flex items-center gap-2 ${activeTab === 'health' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'bg-indigo-700/50 text-indigo-100 hover:bg-indigo-600'}`}
+              >
+                <span>💊</span> My Health
+              </button>
+              <button
+                onClick={() => setActiveTab('caregiver')}
+                className={`px-5 py-2 rounded-full font-semibold transition-all duration-300 flex items-center gap-2 ${activeTab === 'caregiver' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'bg-indigo-700/50 text-indigo-100 hover:bg-indigo-600'}`}
+              >
+                <span>🛡️</span> Care Network
+              </button>
+            </div>
           </div>
-          <div className="mt-4 sm:mt-0 text-center bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4">
+          <div className="mt-4 sm:mt-0 text-center bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/10">
             <p className="text-sm text-white/80">Next Reminder</p>
             <p className="text-2xl font-bold mt-1">
               {nextReminder
                 ? `${new Date(nextReminder.time).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })} — ${nextReminder.medicineId?.medicineName}`
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })} — ${nextReminder.medicineId?.medicineName}`
                 : "No upcoming reminders"}
             </p>
           </div>
         </div>
       </section>
 
-      {/* 💊 Medicine Section */}
-      <section className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* ➕ Add/Edit Medicine */}
-        <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
-            <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-              ➕ Add / Edit Medicine
+      {/* VIEW: My Health */}
+      {activeTab === 'health' && (
+        <div className="animate-fadeIn">
+          {/* 💊 Medicine Section */}
+          <section className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
+            {/* ➕ Add/Edit Medicine */}
+            <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
+              <h2 className="text-2xl font-semibold text-indigo-700 mb-6 flex items-center gap-2">
+                ➕ Add / Edit Medicine
+              </h2>
+              <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent">
+                <MedicineForm
+                  onSuccess={handleMedicineUpdate}
+                  medicine={selectedMedicine}
+                />
+              </div>
+            </div>
+
+            {/* 💊 Medicine List */}
+            <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50">
+              <MedicineList
+                medicines={medicines}
+                reminders={reminders}
+                onUpdate={handleMedicineUpdate}
+                onEdit={setSelectedMedicine}
+              />
+            </div>
+          </section>
+
+          {/* 📅 Calendar */}
+          <section className="max-w-7xl mx-auto px-6">
+            <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50  rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
+              <CalendarView key={refreshTrigger} reminders={reminders} />
+            </div>
+          </section>
+
+          {/* 📊 Dashboard & History */}
+          <section className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
+              <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
+                📊 Progress Overview
+              </h2>
+              <DashboardChart key={refreshTrigger} history={history} />
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
+              <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2 justify-center">
+                📘 Dose History
+              </h2>
+              <HistoryTable history={history} />
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* VIEW: Care Network */}
+      {activeTab === 'caregiver' && (
+        <div className="animate-fadeIn py-12 space-y-12">
+          {/* 🛡️ Caregivers Section */}
+          <section className="max-w-7xl mx-auto px-6">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+              🛡️ My Care Team <span className="text-sm font-normal text-slate-500 ml-2">(People caring for me)</span>
             </h2>
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent">
-            <MedicineForm
-              onSuccess={handleMedicineUpdate}
-              medicine={selectedMedicine}
-            />
-          </div>
-          </div>
+            <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl">
+              <CaregiverList />
+            </div>
+          </section>
 
-        {/* 💊 Medicine List */}
-         <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50">
-         
-            <MedicineList
-              medicines={medicines}
-              reminders={reminders}
-              onUpdate={handleMedicineUpdate}
-              onEdit={setSelectedMedicine}
-            />
-          </div>
-      </section>
-
-      {/* 📅 Calendar */}
-      <section className="max-w-7xl mx-auto px-6">
-       <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50  rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
-          
-          <CalendarView key={refreshTrigger} reminders={reminders} />
+          {/* 🏥 Caregiver Dashboard (For when I am the caregiver) */}
+          <section className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1">
+              <AlertsView />
+            </div>
+            <div className="lg:col-span-2">
+              <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl h-full">
+                <h3 className="text-xl font-bold text-slate-800 mb-4">My Patients</h3>
+                <PatientsView onPatientSelect={setSelectedPatient} />
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+      )}
 
-      {/* 📊 Dashboard & History */}
-      <section className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
-       <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
-          <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-            📊 Progress Overview
-          </h2>
-          <DashboardChart key={refreshTrigger} history={history} />
-        </div>
-
-      <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
-          <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2 justify-center">
-            📘 Dose History
-          </h2>
-          <HistoryTable history={history} />
-          </div>
-      </section>
+      <PatientDetailModal
+        patient={selectedPatient}
+        onClose={() => setSelectedPatient(null)}
+      />
 
       {/* ⚙️ Footer */}
       <footer className="text-center mt-12 py-6 text-sm text-gray-500 border-t border-gray-200">
