@@ -7,6 +7,11 @@ import reminderRoutes from "./routes/reminder.routes.js"
 import chatbotRoute from "./routes/chatbot.routes.js"
 import saveNotificationToken from "./firebase/routes.js"
 import caregiverRoutes from "./routes/caregiver.routes.js"
+import googleAuth from "./routes/googleapis.routes.js"
+import googleCalendarRoutes from "./routes/googleCalender.routes.js";
+import { createRemindersCron } from "./firebase/remindercreationfile.js"
+import { sendnoti } from "./firebase/SendNotification.js"
+
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -24,11 +29,21 @@ app.use(cookieParser())
 app.get("/test", (req, res) => {
   res.send("Test route works!");
 });
+// app.use('/api/v1/users', userRouters)
+// app.use('/api/v1/medicine', medicineRoutes)
+// app.use("/api/v1/reminder", reminderRoutes)
+// app.use("/api/v1/chatbot", chatbotRoute);
+// app.use("/api/v1/save-token", saveNotificationToken)
+app.use("/api/v1/caregiver", caregiverRoutes);
 app.use('/api/v1/users', userRouters)
 app.use('/api/v1/medicine', medicineRoutes)
 app.use("/api/v1/reminder", reminderRoutes)
-app.use("/api/v1/chatbot", chatbotRoute)
+app.use("/api/v1/chatbot", chatbotRoute);
 app.use("/api/v1/save-token", saveNotificationToken)
-app.use("/api/v1/caregiver", caregiverRoutes)
+app.use("/api/v1", googleAuth)
+app.use("/api/v1/google", googleCalendarRoutes);
+
+sendnoti()
+createRemindersCron();
 
 export default app

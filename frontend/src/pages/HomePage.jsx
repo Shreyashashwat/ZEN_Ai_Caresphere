@@ -26,6 +26,11 @@ const HomePage = () => {
 
   const handleLoginChange = (e) =>
     setLoginData({ ...loginData, [e.target.name]: e.target.value });
+  const handleGoogleLogin = () => {
+  // Redirect directly to backend Google OAuth
+  window.location.href = "http://localhost:8000/api/v1/auth/google";
+};
+
 
   const handleRegisterChange = (e) =>
     setRegisterData({ ...registerData, [e.target.name]: e.target.value });
@@ -33,33 +38,23 @@ const HomePage = () => {
   // ------------------- Updated Login Submit -------------------
   
 const handleLoginSubmit = async (e) => {
-  e.preventDefault();  // Prevent default form submit
-  // log current form state
+  e.preventDefault();
 
   try {
-    // Send loginData (email & password) to backend
-    const res = await loginUser(loginData);  
-
+    const res = await loginUser(loginData);
     const { user, token } = res.data.data;
 
-
-    // Save user info and token locally
     localStorage.setItem(
       "user",
       JSON.stringify({ _id: user._id, username: user.username, token })
     );
 
-    // Redirect to Google OAuth if not connected
-    if (!user.hasGoogleAccount) {
-      window.location.href = `http://localhost:8000/api/v1/auth/google?token=${token}`;
-      return;
-    }
-
-    // Navigate to patient page if already connected
+    // ✅ ALWAYS go to patient
     navigate("/patient");
+
   } catch (error) {
     console.error("Login error:", error);
-    alert("Login failed! Check credentials or server connection.");
+    alert("Login failed! Check credentials.");
   }
 };
 
@@ -112,27 +107,49 @@ const handleLoginSubmit = async (e) => {
 
           {showLogin ? (
             <form className="space-y-5" onSubmit={handleLoginSubmit}>
-              <input
-                type="email"
-                name="email"
-                value={loginData.email}
-                onChange={handleLoginChange}
-                placeholder="Email"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
-              />
-              <input
-                type="password"
-                name="password"
-                value={loginData.password}
-                onChange={handleLoginChange}
-                placeholder="Password"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
-              />
-              <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow shadow-md">
-                Login
-              </button>
+  <input
+    type="email"
+    name="email"
+    value={loginData.email}
+    onChange={handleLoginChange}
+    placeholder="Email"
+    required
+    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400"
+  />
+
+  <input
+    type="password"
+    name="password"
+    value={loginData.password}
+    onChange={handleLoginChange}
+    placeholder="Password"
+    required
+    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400"
+  />
+
+  <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold">
+    Login
+  </button>
+
+  {/* Google Sign In */}
+  <div className="flex items-center gap-3 my-4">
+    <div className="flex-1 h-px bg-gray-300"></div>
+    <span className="text-gray-500 text-sm">OR</span>
+    <div className="flex-1 h-px bg-gray-300"></div>
+  </div>
+
+  <button
+    type="button"
+    onClick={handleGoogleLogin}
+    className="w-full flex items-center justify-center gap-3 py-3 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100"
+  >
+    <img
+      src="https://developers.google.com/identity/images/g-logo.png"
+      className="w-5 h-5"
+      alt="Google"
+    />
+    Sign in with Google
+  </button>
             </form>
           ) : (
             <form className="space-y-5" onSubmit={handleRegisterSubmit}>
