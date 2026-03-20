@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from "react-route
 
 import Home from "./pages/HomePage";
 import Patient from "./pages/patient";
+import DoctorDashboard from "./pages/DoctorDashboard";
 import Header from "./components/Header";
 import ChatWidget from "./pages/Chatbot.jsx";
 import About from "./pages/About";
@@ -13,12 +14,9 @@ import Messaging from "./Firebase/Messaging.jsx";
 import { onMessage } from "firebase/messaging";
 import { messaging } from "./Firebase/firebase";
 
-function HeaderWrapper() {
-  const location = useLocation();
-  // Hide global header on specific paths
-  if (location.pathname === "/caregiver-dashboard") return null;
-  return <Header />;
-}
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import MedicineReminderToast from "./components/MedicineReminderToast";
 
 function ChatbotWrapper() {
   const location = useLocation();
@@ -28,12 +26,17 @@ function ChatbotWrapper() {
     if (location.pathname !== "/patient") return;
 
     const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground message received:", payload);
-      if (Notification.permission === "granted" && payload.notification) {
-        new Notification(payload.notification.title, {
-          body: payload.notification.body,
-        });
-      }
+      console.log("Foreground FCM message received:", payload);
+
+      // Use data payload from backend (data-only message)
+      const { title, body, medicineId } = payload.data || {};
+
+      if (!medicineId) return; // skip invalid messages
+
+      toast.info(
+        <MedicineReminderToast title={title || "💊 Medicine Reminder"} body={body || ""} medicineId={medicineId} />,
+        { autoClose: false, closeOnClick: false }
+      );
     });
 
     return () => unsubscribe();
@@ -57,7 +60,7 @@ function App() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/firebase-messaging-sw.js")
-        .then((reg) => console.log("SW registered:", reg))
+        .then((reg) => console.log("Service Worker registered:", reg))
         .catch((err) => console.error("SW registration failed:", err));
     }
   }, []);
@@ -65,16 +68,17 @@ function App() {
   return (
     <UserProvider>
       <Router>
-        <HeaderWrapper />
+        <Header />
         <Messaging /> {/* Requests notification permission */}
         <Routes>
           <Route path="/" element={<Home />} />
-
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
+          <Route path="/doctor" element={<DoctorDashboard />} />
         </Routes>
-        <ChatbotWrapper /> {/* Foreground notifications */}
+        <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
+        <ToastContainer position="top-right" />
       </Router>
     </UserProvider>
   );

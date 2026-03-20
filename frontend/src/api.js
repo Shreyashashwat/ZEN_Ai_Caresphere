@@ -48,4 +48,14 @@ export const respondToInvite = (id, action) => API.post(`/caregiver/respond/${id
 export const getMyPatients = () => API.get("/caregiver/my-patients");
 export const getPatientDetails = (id) => API.get(`/caregiver/patient/${id}`);
 
+// Doctor-Patient Request APIs
+export const getAllDoctors = () => API.get("/doctors");
+export const sendDoctorRequest = (doctorId) => API.post("/doctor-request/send", { doctorId });
+export const getPatientRequests = () => API.get("/doctor-request/patient-requests");
+export const getPatientRequestStatus = (doctorId) => API.get(`/doctor-request/status/${doctorId}`);
+export const getPendingDoctorRequests = () => API.get("/doctor-request/pending");
+export const acceptDoctorRequest = (requestId) => API.post(`/doctor-request/${requestId}/accept`);
+export const rejectDoctorRequest = (requestId) => API.post(`/doctor-request/${requestId}/reject`);
+export const getDoctorDashboard = () => API.get("/doctor/dashboard");
+
 export default API;
