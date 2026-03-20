@@ -3,6 +3,9 @@
 import cron from "node-cron";
 import admin from "./firebaseAdmin.js";
 import { Medicine } from "../model/medicine.model.js";
+import { Reminder } from "../model/reminderstatus.js";
+import { addMedicineToGoogleCalendar } from "../utils/googleCalendar.js";
+
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
@@ -33,8 +36,7 @@ async function sendEmail(to, subject, text, html) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("email send");
-    // console.log(`📧 Email sent to ${to}: ${info.messageId}`);
+    console.log(`📧 Email sent to ${to}: ${info.messageId}`);
   } catch (err) {
     console.error("Error sending email:", err);
   }
