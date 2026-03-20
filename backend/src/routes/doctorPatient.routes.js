@@ -1,63 +1,35 @@
-import { Schema, model } from "mongoose";
-import jwt from "jsonwebtoken"
-import bcrypt from "bcrypt"
-const Doctor= new Schema(
-  {
-    username: {
-      type: String, 
-      required: true, 
-      trim: true, 
-    },
-    email:{
-        type:String,
-        required:true,
-        unique:true,
-        trim:true,
+import { Router } from "express";
+import { verifyJwt } from "../middleware/auth.middleware.js";
+import {
+  sendDoctorRequest,
+  getPendingRequests,
+  acceptRequest,
+  rejectRequest,
+  getDoctorDashboard,
+  getAllDoctors,
+  getPatientRequestStatus,
+  getPatientRequests,
+  getDoctorAppointments,
+  scheduleAppointment,
+  updateAppointmentStatus,
+  
+} from "../controllers/doctorPatient.controller.js";
 
-    },
-    code: {
-      type: String,
-      required: true, 
-      unique: true, 
-      uppercase: true, 
-      trim: true,
-    },
-    role:{
-        type:String,
-        default:"doctor",
-    },
-    password:{
-         type:String,
-         required:[true,"Password is required"],
+const router = Router();
 
-    },
-    
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-  },
-  { timestamps: true }
-);
+router.get("/doctors", getAllDoctors);
 
-Doctor.pre("save", async function(next){
-    if(this.isModified("password")){
-        this.password=await bcrypt.hash(this.password,10)
-    }
-     next();
-    
-})
-Doctor.methods.isPasswordCorrect=async function (password) {
-    return await bcrypt.compare(password,this.password)
-    
-}
+router.post("/doctor-request/send", verifyJwt, sendDoctorRequest);
+router.get("/doctor-request/patient-requests", verifyJwt, getPatientRequests);
+router.get("/doctor-request/status/:doctorId", verifyJwt, getPatientRequestStatus);
 
-Doctor.methods.generateToken = function () {
-  return jwt.sign(
-    { id: this._id, email: this.email },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-};
+// Doctor routes - require authentication
+router.get("/doctor-request/pending", verifyJwt, getPendingRequests);
+router.post("/doctor-request/:id/accept", verifyJwt, acceptRequest);
+router.post("/doctor-request/:id/reject", verifyJwt, rejectRequest);
+router.get("/doctor/dashboard", verifyJwt, getDoctorDashboard);
+router.post("/doctor-request/createAppointment",verifyJwt,scheduleAppointment);
+router.get("/doctor-request/getappointments",verifyJwt,getDoctorAppointments);
+router.post("/doctor-request/appointments/:appointmentId",updateAppointmentStatus)
 
-export default model("Doctor", Doctor);
+export default router;

@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-router.use(verifyJwt); // Protect all routes
+router.use(verifyJwt); 
 
 router.post("/invite", inviteCaregiver);
 router.get("/my-caregivers", getMyCaregivers);

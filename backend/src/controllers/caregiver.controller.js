@@ -1,33 +1,33 @@
 import mongoose from "mongoose";
 import { User } from "../model/user.model.js";
 import { CaregiverLink } from "../model/caregiverLink.model.js";
-import { sendEmail, sendPushNotification } from "../firebase/SendNotification.js";
 
-/**
- * ================================
- * PATIENT ACTIONS
- * ================================
- */
 
-/**
- * Invite a caregiver (Any user can invite)
- */
 export const inviteCaregiver = async (req, res) => {
     try {
         const { email } = req.body;
         const patientId = req.user.id;
 
         if (!email) {
-            return res.status(400).json({ success: false, message: "Caregiver email is required" });
+            return res.status(400).json({
+                success: false,
+                message: "Caregiver email is required",
+            });
         }
 
         const caregiver = await User.findOne({ email: email.toLowerCase() });
         if (!caregiver) {
-            return res.status(404).json({ success: false, message: "Caregiver user not found" });
+            return res.status(404).json({
+                success: false,
+                message: "Caregiver user not found",
+            });
         }
 
         if (caregiver._id.toString() === patientId) {
-            return res.status(400).json({ success: false, message: "You cannot invite yourself" });
+            return res.status(400).json({
+                success: false,
+                message: "You cannot invite yourself",
+            });
         }
 
         const existing = await CaregiverLink.findOne({
@@ -42,45 +42,11 @@ export const inviteCaregiver = async (req, res) => {
             });
         }
 
-        const { relationship, message } = req.body;
-
         await CaregiverLink.create({
             patientId,
             caregiverId: caregiver._id,
-            caregiverEmail: caregiver.email,
-            relationship: relationship || "Family Member",
-            message: message || "",
-            status: "Pending", // Title Case to match enum
+            status: "pending",
         });
-
-        // Fetch patient details to ensure we have correct name/email for the invite
-        const patient = await User.findById(patientId);
-        const patientName = patient?.username || req.user.username || "A patient";
-        const patientEmail = patient?.email || req.user.email;
-
-        // NOTIFICATION LOGIC (Fire and forget, or await safely)
-        (async () => {
-            try {
-                // 1. Email
-                if (caregiver.email) {
-                    const subject = "CareSphere - New Caregiver Invite";
-                    const text = `Hello ${caregiver.username},\n\n${patientName} (${patientEmail}) has invited you to be their caregiver on CareSphere.\n\nPlease log in to your dashboard to accept or reject this request.`;
-                    const html = `<p>Hello <b>${caregiver.username}</b>,</p><p><b>${patientName}</b> (${patientEmail}) has invited you to be their caregiver.</p><p>Please log in to CareSphere to respond.</p>`;
-                    await sendEmail(caregiver.email, subject, text, html);
-                }
-
-                // 2. Push Notification
-                if (caregiver.fcmToken) {
-                    await sendPushNotification(
-                        caregiver.fcmToken,
-                        "New Caregiver Invitation",
-                        `${patientName} wants you to be their caregiver.`
-                    );
-                }
-            } catch (innerErr) {
-                console.error("Notification error in inviteCaregiver:", innerErr);
-            }
-        })();
 
         return res.status(201).json({
             success: true,
@@ -95,9 +61,7 @@ export const inviteCaregiver = async (req, res) => {
     }
 };
 
-/**
- * Get my caregivers
- */
+
 export const getMyCaregivers = async (req, res) => {
     try {
         const caregivers = await CaregiverLink.find({
@@ -128,15 +92,7 @@ export const getMyCaregivers = async (req, res) => {
 
 
 
-/**
- * ================================
- * CAREGIVER ACTIONS
- * ================================
- */
 
-/**
- * Get pending invitations
- */
 export const getPendingInvites = async (req, res) => {
     try {
         const invites = await CaregiverLink.find({
@@ -154,10 +110,7 @@ export const getPendingInvites = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            invites: formatted, // Frontend expects 'data' prop? No, AlertsView check res.data.data
-            // Wait, previous controller returned { data: formattedInvites }. 
-            // Step 419: return res.status(200).json({ success: true, data: formattedInvites });
-            // Let's stick to 'data' to avoid breaking frontend.
+            invites: formatted,
             data: formatted
         });
     } catch (error) {
@@ -169,12 +122,10 @@ export const getPendingInvites = async (req, res) => {
     }
 };
 
-/**
- * Accept or Reject invite
- */
+
 export const respondToInvite = async (req, res) => {
     try {
-        const { id } = req.params; // Was inviteId in user code
+        const { id } = req.params; 
         const { action } = req.body;
 
         if (!["accept", "reject"].includes(action)) {
@@ -197,45 +148,11 @@ export const respondToInvite = async (req, res) => {
             });
         }
 
-        invite.status = action === "accept" ? "active" : "rejected"; // Use 'active' not 'accepted' to match prev logic?
-        // Step 419 used 'Active'. Step 424 User userd 'accepted'.
-        // Frontend likely reads this. Let's use 'Active' (Title Case) if consistent with legacy?
-        // Or 'active' lowercase? 
-        // CaregiverLink model (Step 305): enum: ["Pending", "Active", "Rejected"]
-        // So it MUST be "Active".
+        invite.status = action === "accept" ? "active" : "rejected";
+        
         invite.status = action === "accept" ? "Active" : "Rejected";
 
         await invite.save();
-
-        // NOTIFY PATIENT
-        try {
-            const patient = await User.findById(invite.patientId);
-            if (patient) {
-                const caregiverName = req.user.username;
-                const statusMsg = action === "accept" ? "accepted" : "rejected";
-
-                // Email
-                if (patient.email) {
-                    await sendEmail(
-                        patient.email,
-                        "CareSphere - Caregiver Update",
-                        `Hello ${patient.username},\n\n${caregiverName} has ${statusMsg} your caregiver invitation.`,
-                        `<p>Hello <b>${patient.username}</b>,</p><p><b>${caregiverName}</b> has ${statusMsg} your caregiver invitation.</p>`
-                    );
-                }
-
-                // Push
-                if (patient.fcmToken) {
-                    await sendPushNotification(
-                        patient.fcmToken,
-                        "Caregiver Update",
-                        `${caregiverName} has ${statusMsg} your invitation.`
-                    );
-                }
-            }
-        } catch (err) {
-            console.error("Notify patient error:", err);
-        }
 
         return res.status(200).json({
             success: true,
@@ -250,14 +167,12 @@ export const respondToInvite = async (req, res) => {
     }
 };
 
-/**
- * Get assigned patients
- */
+
 export const getAssignedPatients = async (req, res) => {
     try {
         const links = await CaregiverLink.find({
             caregiverId: req.user.id,
-            status: "Active", // Must match enum
+            status: "Active", 
         }).populate("patientId", "username email age gender");
 
         const patients = links.map(link => ({
@@ -271,7 +186,7 @@ export const getAssignedPatients = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            data: patients, // Use 'data' to be safe
+            data: patients,
         });
     } catch (error) {
         console.error("getAssignedPatients error:", error);
@@ -282,15 +197,12 @@ export const getAssignedPatients = async (req, res) => {
     }
 };
 
-/**
- * Get full details of a specific patient (for caregiver view)
- */
+
 export const getPatientDetails = async (req, res) => {
     try {
         const { patientId } = req.params;
         const caregiverId = req.user.id;
 
-        // 1. Verify connection
         const link = await CaregiverLink.findOne({
             patientId,
             caregiverId,
@@ -301,13 +213,11 @@ export const getPatientDetails = async (req, res) => {
             return res.status(403).json({ success: false, message: "Not authorized to view this patient" });
         }
 
-        // 2. Fetch Medicines & Reminders
         const Medicine = mongoose.model("Medicine");
         const Reminder = mongoose.model("Reminder");
 
         const medicines = await Medicine.find({ userId: patientId });
 
-        // 3. Fetch Recent History
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -316,7 +226,6 @@ export const getPatientDetails = async (req, res) => {
             time: { $gte: sevenDaysAgo }
         }).sort({ time: -1 }).limit(50);
 
-        // Calculate adherence
         const total = recentHistory.length;
         const taken = recentHistory.filter(r => r.status === 'taken').length;
         const adherence = total > 0 ? Math.round((taken / total) * 100) : 0;
@@ -337,23 +246,11 @@ export const getPatientDetails = async (req, res) => {
 };
 
 
-/**
- * ================================
- * COMMON
- * ================================
- */
-
-/**
- * Remove caregiver link
- */
+//  * ================================
 export const removeCaregiver = async (req, res) => {
     try {
-        const { id } = req.params; // Router uses :id
-
-        // Allow patient OR caregiver to remove?
-        // User code check role patient.
-        // Let's rely on finding the link by ID where user participates.
-
+        const { id } = req.params; 
+        
         const link = await CaregiverLink.findById(id);
         if (!link) {
             return res.status(404).json({ success: false, message: "Link not found" });

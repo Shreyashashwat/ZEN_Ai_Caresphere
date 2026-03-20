@@ -5,15 +5,16 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import Doctor from "../model/doctor.js";
 
+import { Medicine } from "../model/medicine.model.js";
+import { Reminder } from "../model/reminderstatus.js";
+import { callLLM } from "./llm.controller.js";
+import WeeklyInsight from "../model/insights.model.js";
+import { getWeekRange } from "../utils/getWeeklyRange.js";
 const registerUser = asyncHandler(async (req, res) => {
-  // 1. Get role from body to determine logic flow
   const { username, email, password, age, gender, doctorCode, role } = req.body;
 
-  // ==========================
-  // LOGIC FOR DOCTOR REGISTRATION
-  // ==========================
+ 
   if (role === "doctor") {
-    // For doctor, 'doctorCode' from frontend maps to 'code' in Doctor Schema
     if ([username, email, password, doctorCode].some((field) => field?.trim() === "")) {
       throw new ApiError(400, "All fields (Username, Email, Password, Code) are required for Doctors");
     }
@@ -30,13 +31,12 @@ const registerUser = asyncHandler(async (req, res) => {
       username,
       email,
       password,
-      code: doctorCode, // Mapping frontend 'doctorCode' to Doctor schema 'code'
+      code: doctorCode, 
       role: "doctor"
     });
    console.log(doctor);
     await doctor.save();
     console.log("ijsc")
-    // Remove password from response
     const createdDoctor = await Doctor.findById(doctor._id).select("-password");
     console.log("doctor created")
     return res.status(201).json(
@@ -45,10 +45,7 @@ const registerUser = asyncHandler(async (req, res) => {
   } 
   
   // ==========================
-  // LOGIC FOR PATIENT (USER) REGISTRATION
-  // ==========================
   else {
-    // Existing logic for Patient
     if ([username, email, password, gender, doctorCode].some((field) => field?.trim() === "") || !age) {
       throw new ApiError(400, "All fields are required");
     }
@@ -65,9 +62,6 @@ const registerUser = asyncHandler(async (req, res) => {
       throw new ApiError(409, "User already registered");
     }
 
-    // Verify the doctorCode exists (optional but recommended validation)
-    // const validDoctor = await Doctor.findOne({ code: doctorCode });
-    // if (!validDoctor) throw new ApiError(400, "Invalid Doctor Code provided");
 
     const user = new User({ 
         username, 
@@ -75,7 +69,7 @@ const registerUser = asyncHandler(async (req, res) => {
         password, 
         age, 
         gender, 
-        doctorCode, // Patient stores the code of the doctor they are connecting to
+        doctorCode, 
         role: "user" 
     });
     
@@ -127,24 +121,20 @@ const registerUser1 = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  const { email, password, role } = req.body; // Added role here
+  const { email, password, role } = req.body; 
 
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
   }
 
   let user;
-  let modelType; // To track if it is User or Doctor for token generation
+  let modelType; 
 
-  // ==========================
-  // DOCTOR LOGIN
   // ==========================
   if (role === "doctor") {
     user = await Doctor.findOne({ email });
     modelType = "doctor";
   } 
-  // ==========================
-  // PATIENT (USER) LOGIN
   // ==========================
   else {
     user = await User.findOne({ email });
@@ -160,7 +150,6 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Incorrect password");
   }
 
-  // Generate Token (Payload now includes role)
   const token = jwt.sign(
     { 
       _id: user._id, 
@@ -172,7 +161,6 @@ const loginUser = asyncHandler(async (req, res) => {
     { expiresIn: "7d" }
   );
 
-  // Return user without password
   const loggedInUser = role === "doctor" 
     ? await Doctor.findById(user._id).select("-password")
     : await User.findById(user._id).select("-password");
@@ -224,7 +212,7 @@ const logOut = asyncHandler(async (req, res) => {
 
 const connectToDoctor = asyncHandler(async (req, res) => {
   const { doctorCode } = req.body;
-  const userId = req.user._id; // From verifyJWT middleware
+  const userId = req.user._id; 
 
   if (!doctorCode) throw new ApiError(400, "Doctor code is required");
 
@@ -242,3 +230,137 @@ const connectToDoctor = asyncHandler(async (req, res) => {
 });
 
 export { registerUser, loginUser, logOut,connectToDoctor };
+export const generateWeeklyInsightsForAllUsers = async () => {
+  console.log("🚀 Starting weekly insights generation for all users");
+
+  let users;
+  try {
+    users = await User.find({}, { _id: 1 });
+    console.log(`👥 Found ${users.length} users`);
+  } catch (err) {
+    console.error("❌ Failed to fetch users:", err);
+    return;
+  }
+
+  for (const user of users) {
+    console.log(`\n➡️ Processing user: ${user._id}`);
+    try {
+      await processUserWeeklyInsights(user._id);
+      console.log(`✅ Done for user: ${user._id}`);
+    } catch (err) {
+      console.error(
+        `❌ Error processing user ${user._id}:`,
+        err.message,
+        err.stack
+      );
+    }
+  }
+
+  console.log("🏁 Weekly insights job finished");
+};
+export const processUserWeeklyInsights = async (userId) => {
+  console.log("🧠 processUserWeeklyInsights START", userId);
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  console.log("📅 Fetching data since:", sevenDaysAgo.toISOString());
+
+  // ---------------- MEDICINE LOGS ----------------
+  let medLogs;
+  try {
+    medLogs = await Medicine.find({
+      user_id: userId,
+      date: { $gte: sevenDaysAgo }
+    });
+
+    console.log(`💊 Medicine logs found: ${medLogs.length}`);
+  } catch (err) {
+    console.error("❌ Error fetching medicine logs:", err);
+    throw err;
+  }
+
+  // ---------------- REMINDER LOGS ----------------
+  let reminderLogs;
+  try {
+    reminderLogs = await Reminder.find({
+      user_id: userId,
+      date: { $gte: sevenDaysAgo }
+    });
+
+    console.log(`⏰ Reminder logs found: ${reminderLogs.length}`);
+  } catch (err) {
+    console.error("❌ Error fetching reminder logs:", err);
+    throw err;
+  }
+
+  if (medLogs.length === 0) {
+    console.log("⚠️ No medicine logs → skipping user");
+    return;
+  }
+
+  console.log("📊 Aggregating weekly data");
+
+  const total = medLogs.length;
+  const taken = medLogs.filter(m => m.taken === true).length;
+  const missed = total - taken;
+
+  const adherence = total > 0
+    ? Math.round((taken / total) * 100)
+    : 0;
+
+  const missedTimes = medLogs
+    .filter(m => !m.taken && m.time_bucket)
+    .map(m => m.time_bucket);
+
+  const mostMissed =
+    missedTimes.length > 0 ? missedTimes[0] : "none";
+
+  console.log("📈 Aggregated values:", {
+    total,
+    taken,
+    missed,
+    adherence,
+    mostMissed
+  });
+
+  const weeklySummary = {
+    adherence_percentage: adherence,
+    missed_doses: missed,
+    most_missed_time: mostMissed
+  };
+
+  console.log("🧾 Weekly summary to send to LLM:", weeklySummary);
+
+  // ---------------- LLM CALL ----------------
+  let llmResponse;
+  try {
+    llmResponse = await callLLM(weeklySummary);
+    console.log("🤖 LLM raw response:", llmResponse);
+  } catch (err) {
+    console.error("❌ LLM call failed:", err.message);
+    throw err;
+  }
+
+  if (!llmResponse || !Array.isArray(llmResponse.insights)) {
+    console.error("❌ Invalid LLM response format:", llmResponse);
+    throw new Error("Invalid LLM response");
+  }
+
+  // ---------------- SAVE TO DB ----------------
+  try {
+    const doc = await WeeklyInsight.create({
+      user_id: userId,
+      week: getWeekRange(),
+      insights: llmResponse.insights
+    });
+
+    console.log("💾 WeeklyInsight saved:", doc._id);
+  } catch (err) {
+    console.error("❌ Failed to save WeeklyInsight:", err);
+    throw err;
+  }
+
+  console.log("🎉 processUserWeeklyInsights COMPLETE", userId);
+};
+

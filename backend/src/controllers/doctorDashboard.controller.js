@@ -9,31 +9,24 @@ import { DoctorPatientRequest } from "../model/doctorPatientRequest.model.js";
 import Doctor from "../model/doctor.js";
 
 const getDoctorDashboard = asyncHandler(async (req, res) => {
-    const doctorId = req.user; // From verifyJwt middleware
-
-    // Verify doctor exists
+    const doctorId = req.user;
     const doctor = await Doctor.findById(doctorId);
     if (!doctor) {
         throw new ApiError(404, "Doctor not found");
     }
 
-    // Get all accepted requests for this doctor
     const acceptedRequests = await DoctorPatientRequest.find({
         doctorId,
         status: "ACCEPTED",
     }).populate("patientId", "username email age gender");
 
-    // Extract patient IDs from accepted requests only
     const patientIds = acceptedRequests.map((req) => {
         const patient = req.patientId;
-        // Handle both populated and non-populated cases
         if (patient && patient._id) {
             return patient._id;
         }
-        return patient; // If not populated, it's already an ObjectId
-    }).filter(Boolean); // Remove any null/undefined values
-
-    // If no accepted patients, return empty dashboard
+        return patient;
+    }).filter(Boolean); 
     if (patientIds.length === 0) {
         return res.status(200).json(
             new ApiResponse(

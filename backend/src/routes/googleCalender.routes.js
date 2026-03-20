@@ -1,4 +1,3 @@
-// routes/googleCalendar.routes.js
 import express from "express";
 import { getWebsiteGoogleEvents } from "../controllers/googleCalendar.controller.js";
 

@@ -6,6 +6,7 @@ import { User } from "../model/user.model.js";
 import Doctor from "../model/doctor.js";
 import { Reminder } from "../model/reminderstatus.js";
 import { Medicine } from "../model/medicine.model.js";
+import { Appointment } from "../model/appointment.model.js";
 
 
 const sendDoctorRequest = asyncHandler(async (req, res) => {
@@ -28,7 +29,6 @@ console.log("sending request")
     throw new ApiError(404, "Doctor not found");
   }
 console.log("request sent")
-  // Check if request already exists
   const existingRequest = await DoctorPatientRequest.findOne({
     patientId,
     doctorId,
@@ -60,13 +60,10 @@ console.log("request sent")
     );
 });
 
-/**
- * Doctor gets all pending requests
- */
+
 const getPendingRequests = asyncHandler(async (req, res) => {
-  const doctorId = req.user; // From verifyJwt middleware
+  const doctorId = req.user; 
   console.log("geting request");
-  // Verify doctor exists
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
@@ -91,11 +88,8 @@ const getPendingRequests = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Doctor accepts a request
- */
+
 const acceptRequest = asyncHandler(async (req, res) => {
-  // 1. Correctly extract the ID from the req.user object
   const loggedInDoctorId = req.user._id; 
   const { id } = req.params;
 
@@ -107,16 +101,13 @@ const acceptRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Request not found");
   }
 
-  // Debugging logs to see exactly what is being compared
   console.log("Request Doctor ID:", request.doctorId.toString());
   console.log("Logged-in Doctor ID:", loggedInDoctorId.toString());
 
-  // 2. Use .toString() on both sides to ensure a clean string comparison
   if (request.doctorId.toString() !== loggedInDoctorId.toString()) {
     throw new ApiError(403, "Unauthorized: This request does not belong to you");
   }
 
-  // Update request status
   request.status = "ACCEPTED";
   await request.save();
 
@@ -133,7 +124,7 @@ const acceptRequest = asyncHandler(async (req, res) => {
     );
 });
 const acceptRequest2 = asyncHandler(async (req, res) => {
-  const doctorId = req.user; // From verifyJwt middleware
+  const doctorId = req.user; 
   const { id } = req.params;
 
   const request = await DoctorPatientRequest.findById(id);
@@ -142,12 +133,10 @@ const acceptRequest2 = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Request not found");
   }
   console.log(request);
-  // Verify the request belongs to this doctor
   if (request.doctorId.toString() !== doctorId.toString()) {
     throw new ApiError(403, "Unauthorized: This request does not belong to you");
   }
 
-  // Update request status
   request.status = "ACCEPTED";
   await request.save();
  console.log("request accepted");
@@ -162,11 +151,8 @@ const acceptRequest2 = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Doctor rejects a request
- */
+
 const rejectRequest = asyncHandler(async (req, res) => {
-  // 1. Extract the specific _id from the req.user object
   const loggedInDoctorId = req.user._id; 
   const { id } = req.params;
 
@@ -176,17 +162,13 @@ const rejectRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Request not found");
   }
 
-  // 2. Use Mongoose's .equals() for a reliable comparison
-  // This checks if the ID in the request matches the ID of the logged-in doctor
   if (!request.doctorId.equals(loggedInDoctorId)) {
     throw new ApiError(403, "Unauthorized: This request does not belong to you");
   }
 
-  // Update request status
   request.status = "REJECTED";
   await request.save();
 
-  // Populate info for the response
   const populatedRequest = await DoctorPatientRequest.findById(request._id)
     .populate("patientId", "username email age gender")
     .populate("doctorId", "username email code");
@@ -198,7 +180,7 @@ const rejectRequest = asyncHandler(async (req, res) => {
     );
 });
 const rejectRequest2 = asyncHandler(async (req, res) => {
-  const doctorId = req.user; // From verifyJwt middleware
+  const doctorId = req.user; 
   const { id } = req.params;
 
   const request = await DoctorPatientRequest.findById(id);
@@ -207,12 +189,10 @@ const rejectRequest2 = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Request not found");
   }
 
-  // Verify the request belongs to this doctor
   if (request.doctorId.toString() !== doctorId.toString()) {
     throw new ApiError(403, "Unauthorized: This request does not belong to you");
   }
 
-  // Update request status
   request.status = "REJECTED";
   await request.save();
 
@@ -227,33 +207,26 @@ const rejectRequest2 = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Get doctor dashboard with only accepted patients
- */
-const getDoctorDashboard = asyncHandler(async (req, res) => {
-  const doctorId = req.user; // From verifyJwt middleware
 
-  // Verify doctor exists
+const getDoctorDashboard = asyncHandler(async (req, res) => {
+  const doctorId = req.user;
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
   }
 console.log("got doctor dashboard");
-  // Get all accepted requests for this doctor
   const acceptedRequests = await DoctorPatientRequest.find({
     doctorId,
     status: "ACCEPTED",
   }).populate("patientId", "username email age gender");
 
-  // Extract patient IDs
   const patientIds = acceptedRequests.map((req) => {
     const patient = req.patientId;
-    // Handle both populated and non-populated cases
     if (patient && patient._id) {
       return patient._id;
     }
-    return patient; // If not populated, it's already an ObjectId
-  }).filter(Boolean); // Remove any null/undefined values
+    return patient;
+  }).filter(Boolean); 
 
   if (patientIds.length === 0) {
     return res.status(200).json(
@@ -274,7 +247,6 @@ console.log("got doctor dashboard");
     );
   }
 
-  // Get patients data
   const patients = await User.find({ _id: { $in: patientIds } }).select(
     "-password"
   );
@@ -284,7 +256,6 @@ console.log("got doctor dashboard");
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
 
-  // Fetch reminders and medicines only for accepted patients
   const [todayReminders, allRecentReminders] = await Promise.all([
     Reminder.find({
       userId: { $in: patientIds },
@@ -315,12 +286,11 @@ console.log("got doctor dashboard");
   return {
     patientName: patient.username,
     patientId: patient._id,
-    email: patient.email,    // Added
-    age: patient.age,        // Added
-    gender: patient.gender,  // Added
+    email: patient.email,   
+    age: patient.age,       
+    gender: patient.gender, 
     missedCount,
     status: missedCount > 3 ? "Critical" : "Stable",
-    // Filter today's specific medicines for this patient
     todayMedicines: todayReminders.filter(r => r.userId._id.toString() === patient._id.toString())
   };
 });
@@ -337,9 +307,7 @@ console.log("got doctor dashboard");
   );
 });
 
-/**
- * Get all doctors (for patient to see and send requests)
- */
+
 const getAllDoctors = asyncHandler(async (req, res) => {
   const doctors = await Doctor.find({ isActive: true })
     .select("-password")
@@ -352,9 +320,7 @@ const getAllDoctors = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Get patient's request status for a specific doctor
- */
+
 const getPatientRequestStatus = asyncHandler(async (req, res) => {
   const patientId = req.user; // From verifyJwt middleware
   const { doctorId } = req.params;
@@ -381,9 +347,7 @@ const getPatientRequestStatus = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * Get all requests for a patient (to see status of all sent requests)
- */
+
 const getPatientRequests = asyncHandler(async (req, res) => {
   const patientId = req.user;
 
@@ -398,6 +362,59 @@ const getPatientRequests = asyncHandler(async (req, res) => {
     );
 });
 
+
+const scheduleAppointment = asyncHandler(async (req, res) => {
+  const patientId = req.user._id;
+  const { doctorId, appointmentDate, problem } = req.body;
+
+  if (!doctorId || !appointmentDate || !problem) {
+    throw new ApiError(400, "All fields (Doctor, Date, Problem) are required");
+  }
+
+  // Create appointment
+  const appointment = await Appointment.create({
+    patientId,
+    doctorId,
+    appointmentDate,
+    problem,
+    status: "PENDING",
+  });
+
+  return res.status(201).json(
+    new ApiResponse(201, appointment, "Appointment request sent to doctor")
+  );
+});
+
+// controllers/appointmentController.js
+
+export const getDoctorAppointments = async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ doctorId: req.user._id })
+      .populate("patientId", "username email")
+      .sort({ appointmentDate: 1 });
+    res.status(200).json({ success: true, data: appointments });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch appointments" });
+  }
+};
+
+export const updateAppointmentStatus = async (req, res) => {
+  console.log("in update appiontment")
+  const { appointmentId } = req.params;
+  const { status } = req.body; 
+
+  try {
+    const appointment = await Appointment.findByIdAndUpdate(
+      appointmentId,
+      { status },
+      { new: true }
+    );
+    res.status(200).json({ success: true, data: appointment });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update status" });
+  }
+};
+
 export {
   
   getPendingRequests,
@@ -409,4 +426,6 @@ export {
   getAllDoctors,
   getPatientRequestStatus,
   getPatientRequests,
+
+  scheduleAppointment
 };
