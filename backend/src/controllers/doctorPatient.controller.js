@@ -7,17 +7,15 @@ import Doctor from "../model/doctor.js";
 import { Reminder } from "../model/reminderstatus.js";
 import { Medicine } from "../model/medicine.model.js";
 
-/**
- * Patient sends a request to a doctor
- */
+
 const sendDoctorRequest = asyncHandler(async (req, res) => {
-  const patientId = req.user; // From verifyJwt middleware
+  const patientId = req.user; 
   const { doctorId } = req.body;
 
   if (!doctorId) {
     throw new ApiError(400, "Doctor ID is required");
   }
-
+console.log("sending request")
   // Verify patient exists
   const patient = await User.findById(patientId);
   if (!patient) {
@@ -29,7 +27,7 @@ const sendDoctorRequest = asyncHandler(async (req, res) => {
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
   }
-
+console.log("request sent")
   // Check if request already exists
   const existingRequest = await DoctorPatientRequest.findOne({
     patientId,
@@ -67,7 +65,7 @@ const sendDoctorRequest = asyncHandler(async (req, res) => {
  */
 const getPendingRequests = asyncHandler(async (req, res) => {
   const doctorId = req.user; // From verifyJwt middleware
-
+  console.log("geting request");
   // Verify doctor exists
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
@@ -81,6 +79,7 @@ const getPendingRequests = asyncHandler(async (req, res) => {
     .populate("patientId", "username email age gender")
     .sort({ createdAt: -1 });
 
+    console.log("got request")
   return res
     .status(200)
     .json(
@@ -96,15 +95,53 @@ const getPendingRequests = asyncHandler(async (req, res) => {
  * Doctor accepts a request
  */
 const acceptRequest = asyncHandler(async (req, res) => {
-  const doctorId = req.user; // From verifyJwt middleware
+  // 1. Correctly extract the ID from the req.user object
+  const loggedInDoctorId = req.user._id; 
   const { id } = req.params;
 
+  console.log("Accepting request ID:", id);
+  
   const request = await DoctorPatientRequest.findById(id);
 
   if (!request) {
     throw new ApiError(404, "Request not found");
   }
 
+  // Debugging logs to see exactly what is being compared
+  console.log("Request Doctor ID:", request.doctorId.toString());
+  console.log("Logged-in Doctor ID:", loggedInDoctorId.toString());
+
+  // 2. Use .toString() on both sides to ensure a clean string comparison
+  if (request.doctorId.toString() !== loggedInDoctorId.toString()) {
+    throw new ApiError(403, "Unauthorized: This request does not belong to you");
+  }
+
+  // Update request status
+  request.status = "ACCEPTED";
+  await request.save();
+
+  console.log("Request accepted");
+
+  const populatedRequest = await DoctorPatientRequest.findById(request._id)
+    .populate("patientId", "username email age gender")
+    .populate("doctorId", "username email code");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, populatedRequest, "Request accepted successfully")
+    );
+});
+const acceptRequest2 = asyncHandler(async (req, res) => {
+  const doctorId = req.user; // From verifyJwt middleware
+  const { id } = req.params;
+
+  const request = await DoctorPatientRequest.findById(id);
+ console.log("accepting request")
+  if (!request) {
+    throw new ApiError(404, "Request not found");
+  }
+  console.log(request);
   // Verify the request belongs to this doctor
   if (request.doctorId.toString() !== doctorId.toString()) {
     throw new ApiError(403, "Unauthorized: This request does not belong to you");
@@ -113,7 +150,7 @@ const acceptRequest = asyncHandler(async (req, res) => {
   // Update request status
   request.status = "ACCEPTED";
   await request.save();
-
+ console.log("request accepted");
   const populatedRequest = await DoctorPatientRequest.findById(request._id)
     .populate("patientId", "username email age gender")
     .populate("doctorId", "username email code");
@@ -129,6 +166,38 @@ const acceptRequest = asyncHandler(async (req, res) => {
  * Doctor rejects a request
  */
 const rejectRequest = asyncHandler(async (req, res) => {
+  // 1. Extract the specific _id from the req.user object
+  const loggedInDoctorId = req.user._id; 
+  const { id } = req.params;
+
+  const request = await DoctorPatientRequest.findById(id);
+
+  if (!request) {
+    throw new ApiError(404, "Request not found");
+  }
+
+  // 2. Use Mongoose's .equals() for a reliable comparison
+  // This checks if the ID in the request matches the ID of the logged-in doctor
+  if (!request.doctorId.equals(loggedInDoctorId)) {
+    throw new ApiError(403, "Unauthorized: This request does not belong to you");
+  }
+
+  // Update request status
+  request.status = "REJECTED";
+  await request.save();
+
+  // Populate info for the response
+  const populatedRequest = await DoctorPatientRequest.findById(request._id)
+    .populate("patientId", "username email age gender")
+    .populate("doctorId", "username email code");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, populatedRequest, "Request rejected successfully")
+    );
+});
+const rejectRequest2 = asyncHandler(async (req, res) => {
   const doctorId = req.user; // From verifyJwt middleware
   const { id } = req.params;
 
@@ -169,7 +238,7 @@ const getDoctorDashboard = asyncHandler(async (req, res) => {
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
   }
-
+console.log("got doctor dashboard");
   // Get all accepted requests for this doctor
   const acceptedRequests = await DoctorPatientRequest.find({
     doctorId,
@@ -238,19 +307,23 @@ const getDoctorDashboard = asyncHandler(async (req, res) => {
   };
 
   const patientAdherence = patients.map((patient) => {
-    const pReminders = allRecentReminders.filter(
-      (r) => r.userId.toString() === patient._id.toString()
-    );
-    const missedCount = pReminders.filter((r) => r.status === "missed").length;
+  const pReminders = allRecentReminders.filter(
+    (r) => r.userId.toString() === patient._id.toString()
+  );
+  const missedCount = pReminders.filter((r) => r.status === "missed").length;
 
-    return {
-      patientName: patient.username,
-      patientId: patient._id,
-      missedCount,
-      status: missedCount > 3 ? "Critical" : "Stable",
-    };
-  });
-
+  return {
+    patientName: patient.username,
+    patientId: patient._id,
+    email: patient.email,    // Added
+    age: patient.age,        // Added
+    gender: patient.gender,  // Added
+    missedCount,
+    status: missedCount > 3 ? "Critical" : "Stable",
+    // Filter today's specific medicines for this patient
+    todayMedicines: todayReminders.filter(r => r.userId._id.toString() === patient._id.toString())
+  };
+});
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -312,7 +385,7 @@ const getPatientRequestStatus = asyncHandler(async (req, res) => {
  * Get all requests for a patient (to see status of all sent requests)
  */
 const getPatientRequests = asyncHandler(async (req, res) => {
-  const patientId = req.user; // From verifyJwt middleware
+  const patientId = req.user;
 
   const requests = await DoctorPatientRequest.find({ patientId })
     .populate("doctorId", "username email code")

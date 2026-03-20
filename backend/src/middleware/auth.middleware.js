@@ -1,8 +1,7 @@
-
-
 import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../model/user.model.js";
+import Doctor from "../model/doctor.js"; // Import Doctor model
 
 export const verifyJwt = async (req, res, next) => {
   try {
@@ -16,16 +15,22 @@ export const verifyJwt = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded._id).select("-password");
+    let user = null;
+
+    if (decoded.role === "doctor") {
+      user = await Doctor.findById(decoded._id).select("-password");
+    } else {
+      user = await User.findById(decoded._id).select("-password");
+    }
 
     if (!user) {
-      throw new ApiError(401, "Invalid token user");
+      throw new ApiError(401, "Invalid token user: Account not found");
     }
 
     req.user = user; 
     next();
   } catch (error) {
-    next(error);
+    next(new ApiError(401, error.message || "Invalid or expired token"));
   }
 };
 
