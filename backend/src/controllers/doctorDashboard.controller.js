@@ -1,3 +1,4 @@
+
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -61,7 +62,6 @@ const getDoctorDashboard = asyncHandler(async (req, res) => {
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    // Fetch reminders and medicines ONLY for accepted patients
     const [todayReminders, allRecentReminders] = await Promise.all([
         Reminder.find({
             userId: { $in: patientIds },

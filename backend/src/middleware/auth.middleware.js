@@ -1,21 +1,37 @@
+
+
 import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
+import { User } from "../model/user.model.js";
 
-export const verifyJwt = (req, res, next) => {
-  const token = req.cookies?.token || req.headers.authorization?.split(" ")[1];
-  if (!token) throw new ApiError(401, "Unauthorized: No token provided");
-
+export const verifyJwt = async (req, res, next) => {
   try {
+    const token =
+      req.cookies?.token ||
+      req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      throw new ApiError(401, "Unauthorized: No token provided");
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // Support both 'id' (from user model method) and '_id' (from login controller)
-    req.user = {
-      id: decoded.id || decoded._id,
-      email: decoded.email,
-      role: decoded.role,
-    };
-    console.log("Decoded token:", decoded);
+
+    const user = await User.findById(decoded._id).select("-password");
+
+    if (!user) {
+      throw new ApiError(401, "Invalid token user");
+    }
+
+    req.user = user; 
     next();
   } catch (error) {
-    throw new ApiError(401, "Invalid or expired token");
+    next(error);
   }
+};
+
+export const doctorOnly = (req, res, next) => {
+  if (req.user?.role !== "doctor") {
+    return res.status(403).json({ message: "Doctor access only" });
+  }
+  next();
 };

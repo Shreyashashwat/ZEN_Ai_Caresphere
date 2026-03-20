@@ -59,5 +59,4 @@ Doctor.methods.generateToken = function () {
     { expiresIn: "7d" }
   );
 };
-
 export default model("Doctor", Doctor);

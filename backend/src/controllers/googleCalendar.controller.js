@@ -7,7 +7,7 @@ import { Reminder } from "../model/reminderstatus.js";
 
 export const getWebsiteGoogleEvents = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user;
 
     // 1️⃣ Find user's calendar tokens
     const calendarData = await Calendar.findOne({ userId });
@@ -59,7 +59,7 @@ export const getWebsiteGoogleEvents = async (req, res) => {
 
     res.json({ events });
   } catch (error) {
-    console.error("❌ Failed to fetch website events:", error.message);
+    console.error("Failed to fetch website events:", error.message);
     res.status(500).json({ message: "Failed to fetch website events" });
   }
 };
