@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { User } from "../model/user.model.js";
 import { CaregiverLink } from "../model/caregiverLink.model.js";
+import { sendEmail, sendPushNotification } from "../firebase/SendNotification.js";
 
 /**
  * ================================
@@ -17,25 +18,16 @@ export const inviteCaregiver = async (req, res) => {
         const patientId = req.user.id;
 
         if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: "Caregiver email is required",
-            });
+            return res.status(400).json({ success: false, message: "Caregiver email is required" });
         }
 
         const caregiver = await User.findOne({ email: email.toLowerCase() });
         if (!caregiver) {
-            return res.status(404).json({
-                success: false,
-                message: "Caregiver user not found",
-            });
+            return res.status(404).json({ success: false, message: "Caregiver user not found" });
         }
 
         if (caregiver._id.toString() === patientId) {
-            return res.status(400).json({
-                success: false,
-                message: "You cannot invite yourself",
-            });
+            return res.status(400).json({ success: false, message: "You cannot invite yourself" });
         }
 
         const existing = await CaregiverLink.findOne({
@@ -50,11 +42,45 @@ export const inviteCaregiver = async (req, res) => {
             });
         }
 
+        const { relationship, message } = req.body;
+
         await CaregiverLink.create({
             patientId,
             caregiverId: caregiver._id,
-            status: "pending",
+            caregiverEmail: caregiver.email,
+            relationship: relationship || "Family Member",
+            message: message || "",
+            status: "Pending", // Title Case to match enum
         });
+
+        // Fetch patient details to ensure we have correct name/email for the invite
+        const patient = await User.findById(patientId);
+        const patientName = patient?.username || req.user.username || "A patient";
+        const patientEmail = patient?.email || req.user.email;
+
+        // NOTIFICATION LOGIC (Fire and forget, or await safely)
+        (async () => {
+            try {
+                // 1. Email
+                if (caregiver.email) {
+                    const subject = "CareSphere - New Caregiver Invite";
+                    const text = `Hello ${caregiver.username},\n\n${patientName} (${patientEmail}) has invited you to be their caregiver on CareSphere.\n\nPlease log in to your dashboard to accept or reject this request.`;
+                    const html = `<p>Hello <b>${caregiver.username}</b>,</p><p><b>${patientName}</b> (${patientEmail}) has invited you to be their caregiver.</p><p>Please log in to CareSphere to respond.</p>`;
+                    await sendEmail(caregiver.email, subject, text, html);
+                }
+
+                // 2. Push Notification
+                if (caregiver.fcmToken) {
+                    await sendPushNotification(
+                        caregiver.fcmToken,
+                        "New Caregiver Invitation",
+                        `${patientName} wants you to be their caregiver.`
+                    );
+                }
+            } catch (innerErr) {
+                console.error("Notification error in inviteCaregiver:", innerErr);
+            }
+        })();
 
         return res.status(201).json({
             success: true,
@@ -180,6 +206,36 @@ export const respondToInvite = async (req, res) => {
         invite.status = action === "accept" ? "Active" : "Rejected";
 
         await invite.save();
+
+        // NOTIFY PATIENT
+        try {
+            const patient = await User.findById(invite.patientId);
+            if (patient) {
+                const caregiverName = req.user.username;
+                const statusMsg = action === "accept" ? "accepted" : "rejected";
+
+                // Email
+                if (patient.email) {
+                    await sendEmail(
+                        patient.email,
+                        "CareSphere - Caregiver Update",
+                        `Hello ${patient.username},\n\n${caregiverName} has ${statusMsg} your caregiver invitation.`,
+                        `<p>Hello <b>${patient.username}</b>,</p><p><b>${caregiverName}</b> has ${statusMsg} your caregiver invitation.</p>`
+                    );
+                }
+
+                // Push
+                if (patient.fcmToken) {
+                    await sendPushNotification(
+                        patient.fcmToken,
+                        "Caregiver Update",
+                        `${caregiverName} has ${statusMsg} your invitation.`
+                    );
+                }
+            }
+        } catch (err) {
+            console.error("Notify patient error:", err);
+        }
 
         return res.status(200).json({
             success: true,
@@ -322,4 +378,3 @@ export const removeCaregiver = async (req, res) => {
         });
     }
 };
-

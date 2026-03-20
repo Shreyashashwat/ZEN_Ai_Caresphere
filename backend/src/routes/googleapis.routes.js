@@ -7,11 +7,13 @@ import { User } from "../model/user.model.js";
 
 const router = express.Router();
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  "http://localhost:8000/api/v1/oauth2callback"
-);
+const getOAuthClient = () => {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    "http://localhost:8000/api/v1/oauth2callback"
+  );
+};
 
 // ✅ STEP 1: Redirect user to Google OAuth with JWT token encoded in state
 // STEP 1: Redirect user to Google
@@ -23,13 +25,25 @@ router.get("/auth/google", (req, res) => {
     // Verify the token here
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    const redirectUri = "http://localhost:8000/api/v1/oauth2callback";
+
+    console.log("Initializing Google OAuth with:");
+    console.log("Client ID:", process.env.GOOGLE_CLIENT_ID ? (process.env.GOOGLE_CLIENT_ID.substring(0, 5) + "...") : "UNDEFINED");
+    console.log("Redirect URI:", redirectUri);
+
+    const oauth2Client = getOAuthClient();
+
     // Use JWT itself in "state" for Google OAuth
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",      // 👈 forces refresh_token on repeated logins
       scope: ["https://www.googleapis.com/auth/calendar"],
       state: token, // carry entire JWT, not just userId
+      redirect_uri: redirectUri, // ✅ Explicitly pass it here too
+      include_granted_scopes: true
     });
+
+    console.log("Generated Auth URL:", url);
 
     res.redirect(url);
   } catch (err) {
@@ -49,12 +63,14 @@ router.get("/oauth2callback", async (req, res) => {
   try {
     // Decode JWT passed in 'state'
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
-    const userId = decoded._id  // ✅ Fix here
-    console.log(userId,"yess got the userr id");
+    const userId = decoded.id || decoded._id;  // ✅ Fix here
+    console.log(userId, "yess got the userr id");
+
+    const oauth2Client = getOAuthClient();
 
     // Exchange code for access & refresh tokens
     const { tokens } = await oauth2Client.getToken(code);
-    console.log("tokens",tokens);
+    console.log("tokens", tokens);
     oauth2Client.setCredentials(tokens);
 
     // Save Google tokens to the existing user
