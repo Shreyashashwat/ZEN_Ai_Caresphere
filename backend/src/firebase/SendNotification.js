@@ -1,26 +1,53 @@
+
+
 import cron from "node-cron";
 import admin from "./firebaseAdmin.js";
 import { Medicine } from "../model/medicine.model.js";
-import { Reminder } from "../model/reminderstatus.js";
-import { addMedicineToGoogleCalendar } from "../utils/googleCalendar.js";
-import { User } from "../model/user.model.js";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587,
+  secure: process.env.EMAIL_SECURE === "true", // true for port 465
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
-/** 🔔 Send FCM data-only notification */
-async function sendNotification(token, medicine) {
-  const message = {
-    data: {
-      title: `💊 Medicine Reminder`,
-      body: `Time to take your medicine: ${medicine.medicineName} (${medicine.dosage})`,
-      medicineId: medicine._id.toString(),
-    },
-    token,
+transporter.verify()
+
+  .then(() => console.log("Email transporter ready"))
+  .catch(err => console.error("Email transporter error:", err));
+
+
+async function sendEmail(to, subject, text, html) {
+  const mailOptions = {
+    from: `"CareSphere" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    text,
+    html,
   };
 
   try {
-    await admin.messaging().send(message);
-    console.log(`✅ Notification sent to token: ${token}`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("email send");
+    // console.log(`📧 Email sent to ${to}: ${info.messageId}`);
   } catch (err) {
-    console.error("❌ Error sending notification:", err);
+    console.error("Error sending email:", err);
+  }
+}
+
+
+async function sendNotification(token, title, body) {
+  const message = { notification: { title, body }, token };
+  try {
+    await admin.messaging().send(message);
+    console.log(`Notification sent to token: ${token}`);
+  } catch (err) {
+    console.error("Error sending notification:", err);
   }
 }
 

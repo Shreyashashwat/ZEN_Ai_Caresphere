@@ -75,8 +75,12 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
         </Routes>
+<<<<<<< HEAD
         <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
         <ToastContainer position="top-right" />
+=======
+        <ChatbotWrapper /> 
+>>>>>>> origin/advance-feature
       </Router>
     </UserProvider>
   );
