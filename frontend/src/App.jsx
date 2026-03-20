@@ -62,7 +62,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
         </Routes>
-        <ChatbotWrapper />
+        <ChatbotWrapper /> 
       </Router>
     </UserProvider>
   );

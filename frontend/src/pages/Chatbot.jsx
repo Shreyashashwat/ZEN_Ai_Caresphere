@@ -7,12 +7,12 @@ function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // 🧩 Load userId and token from localStorage
+
   const storedUser = JSON.parse(localStorage.getItem("user"));
   const userId = storedUser?._id;
   const authToken = storedUser?.token;
 
-  // Auto-scroll when messages update
+ 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -26,7 +26,7 @@ function ChatWidget() {
     setMessages((msgs) => [...msgs, userMessage]);
 
     try {
-      // 🧠 Log what’s being sent for debugging
+   
       console.log("Sending message with token:", authToken);
 
       const resp = await axios.post(
@@ -39,6 +39,7 @@ function ChatWidget() {
           },
         }
       );
+
       const botReply = resp.data.reply;
       setMessages((msgs) => [...msgs, { from: "bot", text: botReply }]);
     } catch (err) {
@@ -61,7 +62,7 @@ function ChatWidget() {
 
   return (
     <div className="fixed bottom-4 right-4">
-      {/* Toggle Button */}
+  
       <button
         onClick={toggleChat}
         className="bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600"
@@ -69,7 +70,7 @@ function ChatWidget() {
         {isOpen ? "✖" : "💬"}
       </button>
 
-      {/* Chat Window */}
+  
       {isOpen && (
         <div className="w-80 h-96 bg-white shadow-lg rounded-lg flex flex-col mt-2">
           <div className="bg-blue-500 text-white p-2 rounded-t-lg text-center font-semibold">

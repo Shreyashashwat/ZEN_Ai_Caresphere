@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 
 
 const registerUser = asyncHandler(async (req, res) => {
-    console.log("yes")
+  console.log("yes noo")
   const { username, email, password, age, gender } = req.body;
 
   if ([username, email, password, gender].some((field) => field?.trim() === "") || !age) {
@@ -41,7 +41,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
 
 const loginUser = asyncHandler(async (req, res) => {
-  console.log(" loginUser called with:", req.body);
+  console.log(" yes");
   const { email, password } = req.body;
 
   if (!email || !password) throw new ApiError(400, "Email and password are required");

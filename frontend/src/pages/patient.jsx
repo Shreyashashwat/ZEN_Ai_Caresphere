@@ -20,9 +20,9 @@ const Patient = () => {
   const [history, setHistory] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [nextReminder, setNextReminder] = useState(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // triggers updates for dashboard/calendar
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
    
-  // Fetch Medicines
+
   const fetchMedicines = async () => {
     try {
       const res = await getMedicines();
@@ -33,7 +33,7 @@ const Patient = () => {
     }
   };
 
-  // Fetch History
+ 
   const fetchHistoryData = async () => {
     try {
       const res = await fetchHistory();
@@ -47,25 +47,24 @@ const Patient = () => {
     }
   };
 
-  // Fetch Reminders
-  // Fetch Reminders
+
 const fetchReminders = async () => {
   try {
     const res = await getReminders();
     const remindersArray = Array.isArray(res.data.data) ? res.data.data : [];
 
-    // Sort by time ascending & normalize status
+ 
     remindersArray.sort((a, b) => new Date(a.time) - new Date(b.time));
     remindersArray.forEach(r => {
       if (r.status) r.status = r.status.toLowerCase();
     });
 
-    setReminders([...remindersArray]); // ✅ only set reminders
+    setReminders([...remindersArray]); 
   } catch (err) {
     console.error("Failed to fetch reminders:", err);
   }
 };
-// Recalculate next reminder whenever reminders change
+
 // Recalculate next reminder whenever reminders change
 useEffect(() => {
   const now = new Date();
@@ -102,7 +101,7 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-indigo-100">
-      {/* Header */}
+  
       <header className="sticky top-0 z-20 bg-white/70 backdrop-blur-md shadow-sm border-b border-indigo-100">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
           <h1 className="text-3xl font-extrabold text-indigo-700 tracking-wide">
@@ -117,9 +116,9 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* Main Content */}
+
       <main className="max-w-7xl mx-auto px-6 py-10 space-y-10">
-        {/* Welcome & Next Reminder */}
+    
         <section className="bg-gradient-to-r from-indigo-500 to-blue-500 text-white rounded-3xl p-8 shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-semibold mb-2">
@@ -145,7 +144,7 @@ useEffect(() => {
           </div>
         </section>
 
-        {/* Medicine Form & List */}
+   
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">
             <h2 className="text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
@@ -168,7 +167,7 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Dashboard & Calendar & History */}
+       
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition duration-300 border border-gray-100">
@@ -195,7 +194,7 @@ useEffect(() => {
         </div>
       </main>
 
-      {/* Footer */}
+
       <footer className="text-center mt-12 py-6 text-sm text-gray-500 border-t border-gray-200">
         © {new Date().getFullYear()} CareSphere — Built for better health 🩺
       </footer>

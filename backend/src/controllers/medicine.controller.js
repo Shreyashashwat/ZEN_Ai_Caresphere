@@ -2,6 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Medicine } from "../model/medicine.model.js";
+import { Reminder } from "../model/reminderstatus.js";
 
 
 const getMedicines = asyncHandler(async (req, res) => {
@@ -10,7 +11,7 @@ const getMedicines = asyncHandler(async (req, res) => {
 
   const medicines = await Medicine.find({ userId });
 
- return res.status(200).json(new ApiResponse(200, medicines , "Medicines fetched successfully"));
+  return res.status(200).json(new ApiResponse(200, medicines , "Medicines fetched successfully"));
 });
 
 const addMedicine = asyncHandler(async (req, res) => {
@@ -55,7 +56,7 @@ const updateMedicine = asyncHandler(async (req, res) => {
 const deleteMedicine = asyncHandler(async (req, res) => {
   const medicine = await Medicine.findById(req.params.id);
   if (!medicine) throw new ApiError(404, "Medicine not found");
-
+  await Reminder.deleteMany({ medicineId: medicine._id });
   await medicine.deleteOne();
   return res.status(200).json(new ApiResponse(200, {}, "Medicine deleted successfully"));
 });
