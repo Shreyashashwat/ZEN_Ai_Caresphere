@@ -13,11 +13,6 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 
-
-
-from agent.tools.medicine_tools import make_medicine_tools
-from agent.tools.reminder_tools import make_reminder_tools
-from agent.tools.appointment_tools import make_appointment_tools
 from agent.tools.analytics_tools import make_analytics_tools
 
 from agent.prompts.system_prompt import SYSTEM_PROMPT
@@ -35,10 +30,8 @@ def _build_agent(token: str, user_id: str, system_prompt: str) -> AgentExecutor:
     )
 
     all_tools = (
-        make_medicine_tools(token)
-        + make_reminder_tools(token)
-        + make_appointment_tools(token)
-        + make_analytics_tools(token, user_id)
+
+        make_analytics_tools(token, user_id)
     )
 
     prompt = ChatPromptTemplate.from_messages([
