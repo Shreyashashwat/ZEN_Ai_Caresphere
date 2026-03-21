@@ -5,18 +5,23 @@ import { DoctorPatientRequest } from "../model/doctorPatientRequest.model.js";
 import { User } from "../model/user.model.js";
 import Doctor from "../model/doctor.js";
 import { Reminder } from "../model/reminderstatus.js";
-import { Medicine } from "../model/medicine.model.js";
 import { Appointment } from "../model/appointment.model.js";
+
+const getCurrentUserId = (req) => req.user?._id || req.user?.id || req.user;
 
 
 const sendDoctorRequest = asyncHandler(async (req, res) => {
-  const patientId = req.user; 
+  const patientId = getCurrentUserId(req);
   const { doctorId } = req.body;
+
+  if (!patientId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   if (!doctorId) {
     throw new ApiError(400, "Doctor ID is required");
   }
-console.log("sending request")
+
   // Verify patient exists
   const patient = await User.findById(patientId);
   if (!patient) {
@@ -28,7 +33,7 @@ console.log("sending request")
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
   }
-console.log("request sent")
+
   const existingRequest = await DoctorPatientRequest.findOne({
     patientId,
     doctorId,
@@ -62,8 +67,11 @@ console.log("request sent")
 
 
 const getPendingRequests = asyncHandler(async (req, res) => {
-  const doctorId = req.user; 
-  console.log("geting request");
+  const doctorId = getCurrentUserId(req);
+  if (!doctorId) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
@@ -76,7 +84,6 @@ const getPendingRequests = asyncHandler(async (req, res) => {
     .populate("patientId", "username email age gender")
     .sort({ createdAt: -1 });
 
-    console.log("got request")
   return res
     .status(200)
     .json(
@@ -90,19 +97,18 @@ const getPendingRequests = asyncHandler(async (req, res) => {
 
 
 const acceptRequest = asyncHandler(async (req, res) => {
-  const loggedInDoctorId = req.user._id; 
+  const loggedInDoctorId = getCurrentUserId(req);
   const { id } = req.params;
 
-  console.log("Accepting request ID:", id);
-  
+  if (!loggedInDoctorId) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
   const request = await DoctorPatientRequest.findById(id);
 
   if (!request) {
     throw new ApiError(404, "Request not found");
   }
-
-  console.log("Request Doctor ID:", request.doctorId.toString());
-  console.log("Logged-in Doctor ID:", loggedInDoctorId.toString());
 
   if (request.doctorId.toString() !== loggedInDoctorId.toString()) {
     throw new ApiError(403, "Unauthorized: This request does not belong to you");
@@ -111,35 +117,6 @@ const acceptRequest = asyncHandler(async (req, res) => {
   request.status = "ACCEPTED";
   await request.save();
 
-  console.log("Request accepted");
-
-  const populatedRequest = await DoctorPatientRequest.findById(request._id)
-    .populate("patientId", "username email age gender")
-    .populate("doctorId", "username email code");
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, populatedRequest, "Request accepted successfully")
-    );
-});
-const acceptRequest2 = asyncHandler(async (req, res) => {
-  const doctorId = req.user; 
-  const { id } = req.params;
-
-  const request = await DoctorPatientRequest.findById(id);
- console.log("accepting request")
-  if (!request) {
-    throw new ApiError(404, "Request not found");
-  }
-  console.log(request);
-  if (request.doctorId.toString() !== doctorId.toString()) {
-    throw new ApiError(403, "Unauthorized: This request does not belong to you");
-  }
-
-  request.status = "ACCEPTED";
-  await request.save();
- console.log("request accepted");
   const populatedRequest = await DoctorPatientRequest.findById(request._id)
     .populate("patientId", "username email age gender")
     .populate("doctorId", "username email code");
@@ -153,8 +130,12 @@ const acceptRequest2 = asyncHandler(async (req, res) => {
 
 
 const rejectRequest = asyncHandler(async (req, res) => {
-  const loggedInDoctorId = req.user._id; 
+  const loggedInDoctorId = getCurrentUserId(req);
   const { id } = req.params;
+
+  if (!loggedInDoctorId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   const request = await DoctorPatientRequest.findById(id);
 
@@ -179,42 +160,19 @@ const rejectRequest = asyncHandler(async (req, res) => {
       new ApiResponse(200, populatedRequest, "Request rejected successfully")
     );
 });
-const rejectRequest2 = asyncHandler(async (req, res) => {
-  const doctorId = req.user; 
-  const { id } = req.params;
-
-  const request = await DoctorPatientRequest.findById(id);
-
-  if (!request) {
-    throw new ApiError(404, "Request not found");
-  }
-
-  if (request.doctorId.toString() !== doctorId.toString()) {
-    throw new ApiError(403, "Unauthorized: This request does not belong to you");
-  }
-
-  request.status = "REJECTED";
-  await request.save();
-
-  const populatedRequest = await DoctorPatientRequest.findById(request._id)
-    .populate("patientId", "username email age gender")
-    .populate("doctorId", "username email code");
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, populatedRequest, "Request rejected successfully")
-    );
-});
 
 
 const getDoctorDashboard = asyncHandler(async (req, res) => {
-  const doctorId = req.user;
+  const doctorId = getCurrentUserId(req);
+  if (!doctorId) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     throw new ApiError(404, "Doctor not found");
   }
-console.log("got doctor dashboard");
+
   const acceptedRequests = await DoctorPatientRequest.find({
     doctorId,
     status: "ACCEPTED",
@@ -291,7 +249,10 @@ console.log("got doctor dashboard");
     gender: patient.gender, 
     missedCount,
     status: missedCount > 3 ? "Critical" : "Stable",
-    todayMedicines: todayReminders.filter(r => r.userId._id.toString() === patient._id.toString())
+    todayMedicines: todayReminders.filter((r) => {
+      const reminderUserId = r.userId?._id || r.userId;
+      return reminderUserId?.toString() === patient._id.toString();
+    })
   };
 });
   return res.status(200).json(
@@ -322,8 +283,12 @@ const getAllDoctors = asyncHandler(async (req, res) => {
 
 
 const getPatientRequestStatus = asyncHandler(async (req, res) => {
-  const patientId = req.user; // From verifyJwt middleware
+  const patientId = getCurrentUserId(req);
   const { doctorId } = req.params;
+
+  if (!patientId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   const request = await DoctorPatientRequest.findOne({
     patientId,
@@ -349,7 +314,11 @@ const getPatientRequestStatus = asyncHandler(async (req, res) => {
 
 
 const getPatientRequests = asyncHandler(async (req, res) => {
-  const patientId = req.user;
+  const patientId = getCurrentUserId(req);
+
+  if (!patientId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   const requests = await DoctorPatientRequest.find({ patientId })
     .populate("doctorId", "username email code")
@@ -399,16 +368,30 @@ export const getDoctorAppointments = async (req, res) => {
 };
 
 export const updateAppointmentStatus = async (req, res) => {
-  console.log("in update appiontment")
   const { appointmentId } = req.params;
-  const { status } = req.body; 
+  const { status } = req.body;
+
+  const allowedStatuses = ["PENDING", "SCHEDULED", "COMPLETED", "CANCELLED"];
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
 
   try {
-    const appointment = await Appointment.findByIdAndUpdate(
-      appointmentId,
+    const doctorId = getCurrentUserId(req);
+    if (!doctorId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const appointment = await Appointment.findOneAndUpdate(
+      { _id: appointmentId, doctorId },
       { status },
       { new: true }
     );
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
     res.status(200).json({ success: true, data: appointment });
   } catch (err) {
     res.status(500).json({ message: "Failed to update status" });

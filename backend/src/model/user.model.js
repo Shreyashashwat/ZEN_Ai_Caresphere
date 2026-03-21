@@ -20,43 +20,69 @@ const userSchema = new Schema(
             lowercase: true,
         },
         password: {
-            type: String,
-            required: function () {
-                return !this.hasGoogleAccount;
-            },
-        },
-        hasGoogleAccount: {
-            type: Boolean,
-            default: false,
-        },
-        age: {
-            type: Number,
-            required: true,
-            min: 0,
-            max: 120,
-        },
-        gender: {
-            type: String,
-            enum: ["Male", "Female", "Other"],
-            required: true,
-        },
-        doctorCode: {
-            type: String,
-            default: null,
-        },
-<<<<<<< HEAD
+  type: String,
+  required: function () {
+    return !this.hasGoogleAccount;
+  },
+},
+hasGoogleAccount: {
+  type: Boolean,
+  default: false,
+},
+
+    //     age: {
+    //         type: Number,
+    //         required: true,
+    //         min: 0,
+    //         max: 120,
+    //     },
+    //     gender: {
+    //         type: String,
+    //         enum: ["Male", "Female", "Other"],
+    //         required: true,
+    //     // },
 
 
+    // },
+    age:{
+        type:Number,
+        required:true,
+        min:0,
+        max:120,
+    },
+    gender:{
+        type:String,
+        enum:["Male","Female","Other"],
+        required:true,
+    },
+    fcmToken: {  
+      type: String,
+      default: null,
+    },
+    googleTokens: {
+    access_token: { type: String },
+    refresh_token: { type: String }, 
+    expiry_date: { type: Number }
+},
+// hasGoogleAccount: {
+//   type: Boolean,
+//   default: false,
+// },
+    doctorCode: {
+      type: String,
+      required: true, 
+      unique: true, 
+      uppercase: true, 
+      trim: true,
+    },
+     role:{
+        type:String,
+        default:"user",
+    },
 
         fcmToken: {
             type: String,
             default: null,
-=======
-        googleTokens: {
-            access_token: { type: String },
-            refresh_token: { type: String },
-            expiry_date: { type: Number },
->>>>>>> e56d319948efe25fc699c8a4890e2c61522b0fbd
         },
     },
     {

@@ -6,7 +6,10 @@ import { Reminder } from "../model/reminderstatus.js";
 
 export const getWebsiteGoogleEvents = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?._id || req.user?.id || req.user;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     const calendarData = await Calendar.findOne({ userId });
     if (!calendarData) {

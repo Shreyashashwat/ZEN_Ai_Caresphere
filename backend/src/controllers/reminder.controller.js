@@ -7,12 +7,18 @@ import { updateMedicineInGoogleCalendar } from "../utils/googleCalendar.js";
 import { addMedicineToGoogleCalendar } from "../utils/googleCalendar.js";
 import { suggestNextTime } from "../utils/schedulerLogic.js";
 import { Calendar } from "../model/calendar.model.js";
-import { summarization } from "@huggingface/inference";
-import { AIAnalytics } from "../model/alAnalytics.model.js";
+import { AIAnalytics } from "../model/aIAnalytics.model.js";
 import { predictAdherenceRisk } from "../ml/predict.js";
+
+const getCurrentUserId = (req) => req.user?._id || req.user?.id || req.user;
+
 const addReminder = asyncHandler(async (req, res) => {
   const { medicineId, time, status } = req.body;
-  const userId = req.user.id;
+  const userId = getCurrentUserId(req);
+
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   if (!medicineId || !time)
     throw new ApiError(400, "Medicine ID and time are required");
@@ -64,7 +70,11 @@ const addReminder = asyncHandler(async (req, res) => {
 const updateReminderStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  const userId = req.user.id;
+  const userId = getCurrentUserId(req);
+
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   if (!status || !["pending", "taken", "missed"].includes(status)) {
     throw new ApiError(400, "Invalid status");
@@ -91,7 +101,11 @@ const updateReminderStatus = asyncHandler(async (req, res) => {
 
 
 const getReminders = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = getCurrentUserId(req);
+
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
 
 const reminders = await Reminder.find({ userId })
@@ -104,7 +118,11 @@ const reminders = await Reminder.find({ userId })
 
 const deleteReminder = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
+  const userId = getCurrentUserId(req);
+
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   const reminder = await Reminder.findOne({ _id: id, userId });
   if (!reminder) throw new ApiError(404, "Reminder not found");
@@ -120,8 +138,12 @@ const deleteReminder = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, {}, "Reminder deleted successfully"));
 });
 const markasTaken = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = getCurrentUserId(req);
   const { reminderId } = req.params;
+
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   const reminder = await Reminder.findById(reminderId);
   if (!reminder) throw new ApiError(404, "Reminder not found");
@@ -176,8 +198,12 @@ const createPreReminderIfHighRisk = async (reminder, risk) => {
 };
 
 const markasMissed = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = getCurrentUserId(req);
   const { reminderId } = req.params;
+
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
   const reminder = await Reminder.findById(reminderId);
   if (!reminder) throw new ApiError(404, "Reminder not found");
@@ -283,7 +309,7 @@ const learnAndShiftHabit = async (userId, medicineId) => {
     userResponseTime: { $ne: null },
   })
     .sort({ userResponseTime: -1 })
-    .limit(1);
+    .limit(3);
 
   if (recent.length < 3) return;
 

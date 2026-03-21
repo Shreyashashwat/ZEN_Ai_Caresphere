@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { Medicine } from "../model/medicine.model.js";
 
 const getHistory = asyncHandler(async (req, res) => {
-  const userId = req.user?._id || req.user?.id;
+  const userId = req.user?._id || req.user?.id || req.user;
   
   if (!userId) {
     throw new ApiError(400, "User ID is missing");
@@ -19,9 +19,11 @@ const getHistory = asyncHandler(async (req, res) => {
 
   console.log(`📅 Fetching history from ${startDate.toISOString()} (${days} days)`);
 
-  const medicines = await Medicine.find({ 
-    user_id: userId 
-  }).lean(); 
+  const medicines = await Medicine.find({
+    $or: [{ userId }, { user_id: userId }],
+  })
+    .populate("statusHistory")
+    .lean();
 
   if (!medicines || medicines.length === 0) {
     return res.status(200).json(

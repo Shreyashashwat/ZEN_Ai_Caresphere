@@ -4,12 +4,15 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../model/user.model.js";
 import { Reminder } from "../model/reminderstatus.js";
-import { Medicine } from "../model/medicine.model.js";
 import { DoctorPatientRequest } from "../model/doctorPatientRequest.model.js";
 import Doctor from "../model/doctor.js";
 
 const getDoctorDashboard = asyncHandler(async (req, res) => {
-    const doctorId = req.user;
+    const doctorId = req.user?._id || req.user?.id;
+    if (!doctorId) {
+        throw new ApiError(401, "Unauthorized");
+    }
+
     const doctor = await Doctor.findById(doctorId);
     if (!doctor) {
         throw new ApiError(404, "Doctor not found");

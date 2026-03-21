@@ -45,7 +45,8 @@ export const inviteCaregiver = async (req, res) => {
         await CaregiverLink.create({
             patientId,
             caregiverId: caregiver._id,
-            status: "pending",
+            caregiverEmail: caregiver.email,
+            status: "Pending",
         });
 
         return res.status(201).json({
@@ -97,7 +98,7 @@ export const getPendingInvites = async (req, res) => {
     try {
         const invites = await CaregiverLink.find({
             caregiverId: req.user.id,
-            status: "pending",
+            status: { $in: ["Pending", "pending"] },
         }).populate("patientId", "username email age gender");
 
         const formatted = invites.map(invite => ({
@@ -138,7 +139,7 @@ export const respondToInvite = async (req, res) => {
         const invite = await CaregiverLink.findOne({
             _id: id,
             caregiverId: req.user.id,
-            status: "pending",
+            status: { $in: ["Pending", "pending"] },
         });
 
         if (!invite) {
@@ -148,8 +149,6 @@ export const respondToInvite = async (req, res) => {
             });
         }
 
-        invite.status = action === "accept" ? "active" : "rejected";
-        
         invite.status = action === "accept" ? "Active" : "Rejected";
 
         await invite.save();

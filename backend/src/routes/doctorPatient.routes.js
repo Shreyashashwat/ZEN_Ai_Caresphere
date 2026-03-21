@@ -30,6 +30,6 @@ router.post("/doctor-request/:id/reject", verifyJwt, rejectRequest);
 router.get("/doctor/dashboard", verifyJwt, getDoctorDashboard);
 router.post("/doctor-request/createAppointment",verifyJwt,scheduleAppointment);
 router.get("/doctor-request/getappointments",verifyJwt,getDoctorAppointments);
-router.post("/doctor-request/appointments/:appointmentId",updateAppointmentStatus)
+router.post("/doctor-request/appointments/:appointmentId", verifyJwt, updateAppointmentStatus)
 
 export default router;

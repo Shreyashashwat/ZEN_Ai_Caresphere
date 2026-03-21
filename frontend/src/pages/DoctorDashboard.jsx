@@ -110,7 +110,8 @@ const DoctorDashboard = () => {
     navigate("/");
   };
 
-  const username = JSON.parse(localStorage.getItem("user"))?.username || "Doctor";
+  const userData = JSON.parse(localStorage.getItem("user") || "null");
+  const username = userData?.data?.user?.username || userData?.user?.username || userData?.username || "Doctor";
 
   // ==========================================
   if (selectedPatient) {
@@ -183,6 +184,10 @@ const DoctorDashboard = () => {
                             {med.status === 'taken' ? (
                               <div className="flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-2xl font-bold shadow-md">
                                 <span>☑</span> Taken
+                              </div>
+                            ) : med.status === 'pending' ? (
+                              <div className="flex items-center gap-2 bg-amber-500 text-white px-6 py-3 rounded-2xl font-bold shadow-md">
+                                <span>⏳</span> Pending
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-2xl font-bold shadow-md">
@@ -304,13 +309,13 @@ const DoctorDashboard = () => {
                   </div>
                   <div className="flex gap-2 mt-4 md:mt-0">
                     {apt.status === 'PENDING' && (
-                      <button onClick={() => handleUpdateAptStatus(apt._id, 'ACCEPTED')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold">Approve</button>
+                      <button onClick={() => handleUpdateAptStatus(apt._id, 'SCHEDULED')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold">Approve</button>
                     )}
-                    {apt.status === 'ACCEPTED' && (
+                    {apt.status === 'SCHEDULED' && (
                       <button onClick={() => handleUpdateAptStatus(apt._id, 'COMPLETED')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold">Mark Done</button>
                     )}
-                    {apt.status !== 'COMPLETED' && (
-                      <button onClick={() => handleUpdateAptStatus(apt._id, 'REJECTED')} className="px-4 py-2 bg-white border border-red-200 text-red-500 rounded-lg text-xs font-bold">Cancel</button>
+                    {(apt.status === 'PENDING' || apt.status === 'SCHEDULED') && (
+                      <button onClick={() => handleUpdateAptStatus(apt._id, 'CANCELLED')} className="px-4 py-2 bg-white border border-red-200 text-red-500 rounded-lg text-xs font-bold">Cancel</button>
                     )}
                     <span className="ml-2 px-3 py-2 bg-white rounded-lg text-[10px] font-black border uppercase tracking-widest">{apt.status}</span>
                   </div>

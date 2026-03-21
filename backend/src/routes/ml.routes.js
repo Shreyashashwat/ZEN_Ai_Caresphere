@@ -1,4 +1,4 @@
-// routes/mlRoute.js
+
 import express from "express";
 
 import { trainAdherenceModel } from "../ml/train.js";

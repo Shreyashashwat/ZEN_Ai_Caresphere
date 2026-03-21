@@ -13,6 +13,8 @@ const oauth2Client = new google.auth.OAuth2(
   "http://localhost:8000/api/v1/oauth2callback"
 );
 
+// ✅ STEP 1: Redirect user to Google OAuth with JWT token encoded in state
+// STEP 1: Redirect user to Google
 router.get("/auth/google", (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
