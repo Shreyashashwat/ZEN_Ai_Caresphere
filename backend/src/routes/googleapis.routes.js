@@ -74,7 +74,7 @@ router.get("/oauth2callback", async (req, res) => {
 
     // Redirect to frontend
     res.redirect(
-      `http://localhost:5174/google-success?token=${jwtToken}&userId=${user._id}&username=${encodeURIComponent(user.username)}`
+      `http://localhost:5173/google-success?token=${jwtToken}&userId=${user._id}&username=${encodeURIComponent(user.username)}`
     );
   } catch (err) {
     console.error("Google login error:", err);
