@@ -5,18 +5,21 @@ import {
   acceptDoctorRequest,
   rejectDoctorRequest,
   getDoctorDashboard,
+  getDoctorAppointments, 
+  updateAppointmentStatus, 
 } from "../api";
 
 const DoctorDashboard = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
 
-  // Search States
   const [searchPending, setSearchPending] = useState("");
   const [searchAccepted, setSearchAccepted] = useState("");
+  const [searchApt, setSearchApt] = useState(""); 
 
   const navigate = useNavigate();
 
@@ -44,18 +47,31 @@ const DoctorDashboard = () => {
     }
   };
 
+  const fetchAppointments = async () => {
+    try {
+      const res = await getDoctorAppointments();
+      setAppointments(Array.isArray(res.data.data) ? res.data.data : []);
+    } catch (err) {
+      console.error("Failed to fetch appointments:", err);
+    }
+  };
+
   useEffect(() => {
     fetchPendingRequests();
     fetchDashboardData();
+    fetchAppointments(); 
   }, []);
 
-  // Filtering Logic
   const filteredPending = pendingRequests.filter((req) =>
     req.patientId?.username?.toLowerCase().includes(searchPending.toLowerCase())
   );
 
   const filteredAccepted = (dashboardData?.patientList || []).filter((patient) =>
     patient.patientName?.toLowerCase().includes(searchAccepted.toLowerCase())
+  );
+
+  const filteredApts = appointments.filter((apt) =>
+    apt.patientId?.username?.toLowerCase().includes(searchApt.toLowerCase())
   );
 
   const handleAcceptRequest = async (requestId) => {
@@ -79,6 +95,16 @@ const DoctorDashboard = () => {
     }
   };
 
+  const handleUpdateAptStatus = async (aptId, status) => {
+    try {
+      await updateAppointmentStatus(aptId, status);
+      await fetchAppointments();
+      alert(`Appointment marked as ${status}`);
+    } catch (err) {
+      alert("Failed to update appointment.");
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     navigate("/");
@@ -86,8 +112,6 @@ const DoctorDashboard = () => {
 
   const username = JSON.parse(localStorage.getItem("user"))?.username || "Doctor";
 
-  // ==========================================
-  // VIEW 1: DETAILED PATIENT REPORT CARD
   // ==========================================
   if (selectedPatient) {
     return (
@@ -101,7 +125,6 @@ const DoctorDashboard = () => {
           </button>
 
           <div id="printable-report" className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 pb-10">
-            {/* Report Header */}
             <div className="bg-indigo-700 p-8 text-white">
               <div className="flex justify-between items-start">
                 <div>
@@ -116,7 +139,6 @@ const DoctorDashboard = () => {
             </div>
 
             <div className="p-8">
-              {/* Profile Summary */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                 <div className="p-6 bg-red-50 rounded-2xl border border-red-100 flex justify-between items-center">
                   <div>
@@ -147,7 +169,6 @@ const DoctorDashboard = () => {
                     selectedPatient.todayMedicines.map((med, idx) => (
                       <div key={idx} className="bg-blue-50/50 border border-blue-200 rounded-[2rem] p-6 shadow-sm relative overflow-hidden">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-                          {/* Left Side: Info */}
                           <div className="space-y-1">
                             <h4 className="text-2xl font-bold text-indigo-600 capitalize">
                               {med.medicineId?.medicineName || "N/A"}
@@ -158,7 +179,6 @@ const DoctorDashboard = () => {
                             </div>
                           </div>
 
-                          {/* Right Side: Status Display (Mirroring buttons style) */}
                           <div className="flex flex-wrap gap-3">
                             {med.status === 'taken' ? (
                               <div className="flex items-center gap-2 bg-green-500 text-white px-6 py-3 rounded-2xl font-bold shadow-md">
@@ -174,7 +194,6 @@ const DoctorDashboard = () => {
                             </div>
                           </div>
                         </div>
-                        {/* Decorative background element */}
                         <div className="absolute top-0 right-0 w-32 h-full bg-white/40 skew-x-[-20deg] translate-x-16"></div>
                       </div>
                     ))
@@ -202,8 +221,7 @@ const DoctorDashboard = () => {
   }
 
   // ==========================================
-  // VIEW 2: MAIN DASHBOARD
-  // ==========================================
+  // DASHBOARD
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 pb-20">
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/80 border-b border-indigo-100 shadow-sm px-6 py-4 flex justify-between items-center">
@@ -218,7 +236,7 @@ const DoctorDashboard = () => {
           <p className="opacity-80 mt-1 uppercase tracking-tighter text-sm font-bold">Authorized Medical Dashboard</p>
       </section>
 
-      {/* PENDING REQUESTS: SCROLLABLE + SEARCH */}
+      {/* PENDING REQUESTS*/}
       <section className="max-w-7xl mx-auto px-6 py-8">
         <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 p-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -257,7 +275,53 @@ const DoctorDashboard = () => {
         </div>
       </section>
 
-      {/* PATIENT DIRECTORY: SEARCH + CARDS */}
+      {/*  APPOINTMENTS */}
+      <section className="max-w-7xl mx-auto px-6 mb-8">
+        <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 p-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              📅 Appointment Schedules
+            </h3>
+            <input
+              type="text"
+              placeholder="Search appointments..."
+              className="w-full md:w-72 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-indigo-400 text-sm"
+              value={searchApt}
+              onChange={(e) => setSearchApt(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+            {filteredApts.length === 0 ? (
+              <p className="text-center text-gray-400 py-10 italic">No appointments scheduled.</p>
+            ) : (
+              filteredApts.map((apt) => (
+                <div key={apt._id} className={`flex flex-col md:flex-row md:items-center justify-between p-6 rounded-2xl border ${apt.status === 'COMPLETED' ? 'bg-gray-50 opacity-60' : 'bg-indigo-50/30 border-indigo-100'}`}>
+                  <div>
+                    <h4 className="font-bold text-indigo-700">{apt.patientId?.username}</h4>
+                    <p className="text-xs font-semibold text-gray-500">{new Date(apt.appointmentDate).toLocaleString()}</p>
+                    <p className="text-sm text-gray-600 mt-2 italic">"{apt.problem}"</p>
+                  </div>
+                  <div className="flex gap-2 mt-4 md:mt-0">
+                    {apt.status === 'PENDING' && (
+                      <button onClick={() => handleUpdateAptStatus(apt._id, 'ACCEPTED')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold">Approve</button>
+                    )}
+                    {apt.status === 'ACCEPTED' && (
+                      <button onClick={() => handleUpdateAptStatus(apt._id, 'COMPLETED')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold">Mark Done</button>
+                    )}
+                    {apt.status !== 'COMPLETED' && (
+                      <button onClick={() => handleUpdateAptStatus(apt._id, 'REJECTED')} className="px-4 py-2 bg-white border border-red-200 text-red-500 rounded-lg text-xs font-bold">Cancel</button>
+                    )}
+                    <span className="ml-2 px-3 py-2 bg-white rounded-lg text-[10px] font-black border uppercase tracking-widest">{apt.status}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* PATIENT */}
       <section className="max-w-7xl mx-auto px-6">
         <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 p-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
