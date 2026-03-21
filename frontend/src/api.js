@@ -21,6 +21,11 @@ export const registerUser = (data) => API.post("/users/register", data);
 
 export const getMedicines = () => API.get("/medicine");
 export const addMedicine = (data) => API.post("/medicine", data);
+// Doctor / Connectivity APIs
+export const getAllDoctors = () => API.get("/doctors");
+// export const sendDoctorRequest = (doctorId) => API.post("/users/request-doctor", { doctorId });
+// export const getPatientRequests = () => API.get("/users/patient-requests");
+export const respondToRequest = (requestId, status) => API.put(`/users/request-doctor/${requestId}`, { status });
 export const deleteMedicine = (id) => API.delete(`/medicine/${id}`);
 export const updateMedicine = (id, data) => API.put(`/medicine/${id}`, data);
 export const getMedicine = (id) => API.get(`/medicine/${id}`);
@@ -49,7 +54,7 @@ export const getMyPatients = () => API.get("/caregiver/my-patients");
 export const getPatientDetails = (id) => API.get(`/caregiver/patient/${id}`);
 
 // Doctor-Patient Request APIs
-export const getAllDoctors = () => API.get("/doctors");
+// export const getAllDoctors = () => API.get("/doctors");
 export const sendDoctorRequest = (doctorId) => API.post("/doctor-request/send", { doctorId });
 export const getPatientRequests = () => API.get("/doctor-request/patient-requests");
 export const getPatientRequestStatus = (doctorId) => API.get(`/doctor-request/status/${doctorId}`);
@@ -59,7 +64,6 @@ export const rejectDoctorRequest = (requestId) => API.post(`/doctor-request/${re
 export const getDoctorDashboard = () => API.get("/doctor/dashboard");
 export const createAppointment = (data) => API.post(`/doctor-request/createAppointment`, data);
 export const getDoctorAppointments = () => API.get(`/doctor-request/getappointments`);
-export const updateAppointmentStatus = (appointmentId, status) =>
+export const updateAppointmentStatus = (appointmentId, status) => 
   API.post(`/doctor-request/appointments/${appointmentId}`, { status });
-
 export default API;
