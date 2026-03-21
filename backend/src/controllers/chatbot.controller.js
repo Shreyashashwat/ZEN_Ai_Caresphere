@@ -22,18 +22,22 @@ const fetchHistory = async (userId) => {
   return history;
 };
 
-const hfApiToken = process.env.HUGGINGFACEHUB_API_TOKEN;
-if (!hfApiToken) throw new Error("HUGGINGFACEHUB_API_TOKEN is not defined");
-const client = new InferenceClient(hfApiToken);
 
 export const chatbot = async (req, res) => {
   try {
+    const hfApiToken = process.env.HUGGINGFACEHUB_API_TOKEN;
+    if (!hfApiToken) {
+      console.error("HUGGINGFACEHUB_API_TOKEN is not defined");
+      return res.status(500).json({ error: "Chatbot service unavailable (Configuration Error)" });
+    }
+    const client = new InferenceClient(hfApiToken);
+
     const { userId, message } = req.body;
 
     // Use req.user set by verifyJwt middleware
     if (req.user.toString() !== userId.toString()) {
-  return res.status(403).json({ error: "Unauthorized" });
-}
+      return res.status(403).json({ error: "Unauthorized" });
+    }
 
 
     const userData = await fetchHistory(userId);

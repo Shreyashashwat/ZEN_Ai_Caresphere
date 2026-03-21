@@ -3,15 +3,18 @@ import connectDB from './db/index.js'
 import app from './app.js';
 import { sendnoti } from './firebase/SendNotification.js';
 dotenv.config({ path: './.env' });
-connectDB()
-.then(()=>{
-    const PORT = process.env.PORT || 8000
-    app.listen(PORT,()=>{
-        console.log(`Server is running at ${PORT}`)
-        sendnoti()
-    })
-})
-.catch((err)=>{
-    console.log(` the error is ${err}`)
-    
-})
+const PORT = process.env.PORT || 8000;
+
+app.listen(PORT, () => {
+    console.log(`Server is running at ${PORT}`);
+
+    // Attempt DB connection
+    connectDB()
+        .then(() => {
+            console.log("MongoDB connected successfully");
+            sendnoti();
+        })
+        .catch((err) => {
+            console.log(`MongoDB connection failed: ${err}`);
+        });
+});

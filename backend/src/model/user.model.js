@@ -34,24 +34,23 @@ const userSchema = new Schema(
             enum: ["Male", "Female", "Other"],
             required: true,
         },
-        fcmToken: {
+        doctorCode: {
             type: String,
             default: null,
         },
-        googleTokens: {
-            access_token: { type: String },
-            refresh_token: { type: String },
-            expiry_date: { type: Number },
-        },
-        hasGoogleAccount: {
-            type: Boolean,
-            default: false,
+
+
+
+        fcmToken: {
+            type: String,
+            default: null,
         },
     },
     {
         timestamps: true,
     }
 );
+
 userSchema.pre("save", async function (next) {
     if (this.isModified("password")) {
         this.password = await bcrypt.hash(this.password, 10);

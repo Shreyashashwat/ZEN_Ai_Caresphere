@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../model/user.model.js";
-import Doctor from "../model/doctor.js";
+import { Doctor } from "../model/doctor.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 
@@ -59,7 +59,7 @@ const loginUser = asyncHandler(async (req, res) => {
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
-  // console.log("hgffd");
+  console.log("hgffd");
   console.log("Generated Token:", token);
 
   const loggedInUser = await User.findById(user._id).select("-password");
@@ -104,7 +104,7 @@ const logOut = asyncHandler(async (req, res) => {
 
 const connectToDoctor = asyncHandler(async (req, res) => {
   const { doctorCode } = req.body;
-  const userId = req.user._id; 
+  const userId = req.user._id; // From verifyJWT middleware
 
   if (!doctorCode) throw new ApiError(400, "Doctor code is required");
 

@@ -13,5 +13,4 @@ router.route("/dashboard").get(verifyJwt, getDashboardStats)
 router.route("/history").get(verifyJwt, getHistory)
 router.get("/doctor/dashboard", verifyJwt, getDoctorDashboard);
 router.post("/connect-doctor", verifyJwt, connectToDoctor);
-
 export default router
