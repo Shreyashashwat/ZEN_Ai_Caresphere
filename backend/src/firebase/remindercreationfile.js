@@ -2,11 +2,19 @@ import cron from "node-cron";
 
 import { addReminder } from "../controllers/reminder.controller.js";
 import { Medicine } from "../model/medicine.model.js";
+
+let reminderCronStarted = false; // Prevent duplicate cron jobs
+
 /**
  * 🕒 Reminder Creation Cron
  * TEST MODE: runs every 5 minutes
  */
 const createRemindersCron = () => {
+  if (reminderCronStarted) {
+    console.log("⚠️ Reminder creation cron already running, skipping duplicate");
+    return;
+  }
+
   cron.schedule("*/5 * * * *", async () => {
     console.log("🌙 Reminder creation cron triggered:", new Date().toLocaleString());
 
@@ -34,7 +42,8 @@ const createRemindersCron = () => {
     }
   });
 
-  console.log("🕐 Reminder creation cron scheduled (TEST MODE: every 5 min).");
+  reminderCronStarted = true;
+  console.log("✅ Reminder creation cron scheduled (TEST MODE: every 5 min)");
 };
 
 export { createRemindersCron };

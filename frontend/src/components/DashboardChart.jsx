@@ -49,8 +49,8 @@ const DashboardChart = ({ refreshTrigger }) => {
   if (loading) return <p className="text-center text-gray-500">Loading chart...</p>;
 
   return (
-    <div className="w-full max-w-sm mx-auto p-6 bg-white rounded-3xl shadow-lg">
-      <h2 className="text-xl font-semibold text-center text-indigo-600 mb-4">
+    <div className="w-72 ">
+      <h2 className="text-xl font-bold text-indigo-700 mb-4">
         Medicine Status Overview
       </h2>
       <Doughnut data={data} />

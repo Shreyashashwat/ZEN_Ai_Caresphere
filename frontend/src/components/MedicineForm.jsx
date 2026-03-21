@@ -181,7 +181,7 @@ const MedicineForm = ({ onSuccess, medicine }) => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mx-auto max-w-2xl animate-fadeIn overflow-hidden rounded-3xl border-2 border-blue-100 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 shadow-2xl backdrop-blur-sm transition-all duration-300 hover:shadow-3xl"
+      className="mx-auto w-full animate-fadeIn overflow-hidden rounded-3xl border-2 border-blue-100 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 shadow-2xl backdrop-blur-sm transition-all duration-300 hover:shadow-3xl"
     >
       <div className="border-b border-blue-100 bg-gradient-to-r from-blue-500 to-indigo-600 px-8 py-6 text-white">
         <div className="mb-2 inline-flex rounded-full bg-white/20 px-3 py-1 backdrop-blur-sm">

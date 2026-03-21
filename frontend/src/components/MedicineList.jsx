@@ -5,6 +5,22 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
   const [tick, setTick] = useState(0);
   const [highlighted, setHighlighted] = useState({});
 
+  // Filter out AI-adjusted pre-reminders (created 15 min before actual dose)
+  const filterOutPreReminders = (remindersList) => {
+    return remindersList.filter(reminder => {
+      const reminderTime = new Date(reminder.time).getTime();
+      const hasMainReminder = remindersList.some(r => {
+        const rTime = new Date(r.time).getTime();
+        const timeDiff = rTime - reminderTime;
+        return timeDiff === 900000 && 
+               (r.medicineId?._id || r.medicineId) === (reminder.medicineId?._id || reminder.medicineId);
+      });
+      return !hasMainReminder;
+    });
+  };
+
+  const actualReminders = filterOutPreReminders(reminders);
+
   // Re-render every 30s
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 30000);
@@ -16,7 +32,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
   useEffect(() => {
     const checkMissedReminders = async () => {
       const now = new Date();
-      const overdueReminders = reminders.filter((r) => {
+      const overdueReminders = actualReminders.filter((r) => {
         if (!r?.medicineId || !r.time) return false;
         const reminderTime = new Date(r.time);
         const oneHourLater = new Date(reminderTime.getTime() + 60 * 60000);
@@ -41,7 +57,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
   const getNextMedicineId = () => {
     const now = new Date();
     let next = null;
-    reminders.forEach((r) => {
+    actualReminders.forEach((r) => {
       if (!r || !r.medicineId) return;
       const reminderTime = new Date(r.time);
       if (reminderTime > now && (!next || reminderTime < new Date(next.time))) {
@@ -54,7 +70,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
 
   const isReminderDue = (medicine) => {
     const now = new Date();
-    return reminders.some((r) => {
+    return actualReminders.some((r) => {
       if (!r?.medicineId) return false;
       const reminderTime = new Date(r.time);
       return (
@@ -67,7 +83,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
 
   const handleMarkTaken = async (medicine) => {
     try {
-      const reminder = reminders.find((r) => {
+      const reminder = actualReminders.find((r) => {
         if (!r?.medicineId) return false;
         const reminderTime = new Date(r.time);
         return (
@@ -94,7 +110,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
 
   const handleMarkMissed = async (medicine) => {
     try {
-      const reminder = reminders.find((r) => {
+      const reminder = actualReminders.find((r) => {
         if (!r?.medicineId) return false;
         const reminderTime = new Date(r.time);
         return (
@@ -146,7 +162,7 @@ const MedicineList = ({ medicines, reminders = [], onUpdate, onEdit }) => {
     );
 
   return (
-    <div className="mx-auto mt-10 max-w-6xl animate-fadeIn overflow-hidden rounded-3xl border-2 border-blue-100 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 shadow-2xl">
+    <div className="mx-auto mt-10 w-full animate-fadeIn overflow-hidden rounded-3xl border-2 border-blue-100 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 shadow-2xl">
       <div className="border-b border-blue-100 bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-4 sm:px-8 sm:py-6 text-white">
         <div className="flex items-center justify-between">
           <div>

@@ -32,16 +32,21 @@ router.get("/auth/google", (req, res) => {
 
 
 
+// ✅ STEP 2: Handle Google callback, link tokens to user, redirect to frontend
+// STEP 2: Handle Google callback
 router.get("/oauth2callback", async (req, res) => {
   const { code } = req.query;
 
   try {
+    // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
+    // Get Google profile
     const oauth2 = google.oauth2("v2");
     const { data } = await oauth2.userinfo.get({ auth: oauth2Client });
 
+    // Find or create user
     let user = await User.findOne({ email: data.email });
 
     if (!user) {
@@ -51,6 +56,7 @@ router.get("/oauth2callback", async (req, res) => {
       });
     }
 
+    // Save calendar tokens
     await User.findByIdAndUpdate(user._id, {
       googleTokens: {
         access_token: tokens.access_token,
@@ -60,12 +66,14 @@ router.get("/oauth2callback", async (req, res) => {
       hasGoogleAccount: true,
     });
 
+    // Create JWT
     const jwtToken = jwt.sign(
       { _id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    // Redirect to frontend
     res.redirect(
       `http://localhost:5173/google-success?token=${jwtToken}&userId=${user._id}&username=${encodeURIComponent(user.username)}`
     );

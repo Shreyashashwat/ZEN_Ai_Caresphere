@@ -67,3 +67,303 @@ export const generateStatsReport = async (statsData, username) => {
     // Save the PDF
     pdf.save(`CareSphere_Report_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
+export const generateWeeklyReport = async (weeklyData, username) => {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // Modern Gradient Header
+    pdf.setFillColor(99, 102, 241); // Indigo-600
+    pdf.rect(0, 0, pageWidth, 50, 'F');
+    
+    // Add decorative elements
+    pdf.setFillColor(79, 70, 229, 0.3);
+    pdf.circle(pageWidth - 20, 15, 25, 'F');
+    pdf.setFillColor(59, 130, 246, 0.3);
+    pdf.circle(15, 40, 20, 'F');
+
+    // Title
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(28);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('📊 Weekly Health Report', pageWidth / 2, 22, { align: 'center' });
+
+    pdf.setFontSize(11);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(`Patient: ${username}`, pageWidth / 2, 32, { align: 'center' });
+    
+    const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const endDate = new Date();
+    pdf.text(`Week: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, pageWidth / 2, 38, { align: 'center' });
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 44, { align: 'center' });
+
+    // Reset text color
+    pdf.setTextColor(0, 0, 0);
+
+    // Weekly Summary Card
+    let yPos = 60;
+    pdf.setFillColor(239, 246, 255); // Light blue background
+    pdf.roundedRect(15, yPos, pageWidth - 30, 55, 3, 3, 'F');
+    
+    yPos += 8;
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('📈 Weekly Summary', 20, yPos);
+
+    yPos += 10;
+    pdf.setFontSize(11);
+    pdf.setFont(undefined, 'normal');
+
+    const weeklyStats = [
+        { label: '💊 Active Medications', value: weeklyData.totalMedicines || 0, color: [99, 102, 241] },
+        { label: '✅ Doses Taken', value: weeklyData.takenCount || 0, color: [34, 197, 94] },
+        { label: '⚠️ Doses Missed', value: weeklyData.missedCount || 0, color: [239, 68, 68] },
+        { label: '📊 Adherence Rate', value: `${weeklyData.adherenceRate || 0}%`, color: [59, 130, 246] },
+    ];
+
+    weeklyStats.forEach((stat, index) => {
+        const xPos = 20 + (index % 2) * 90;
+        const yOffset = Math.floor(index / 2) * 18;
+        
+        pdf.setTextColor(...stat.color);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(stat.label, xPos, yPos + yOffset);
+        pdf.setFontSize(18);
+        pdf.text(String(stat.value), xPos + 60, yPos + yOffset);
+        pdf.setFontSize(11);
+    });
+
+    // Daily Breakdown Section
+    yPos += 50;
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('📅 Daily Breakdown', 15, yPos);
+
+    yPos += 8;
+    pdf.setFillColor(249, 250, 251);
+    pdf.rect(15, yPos, pageWidth - 30, 2, 'F');
+
+    yPos += 8;
+    pdf.setFontSize(10);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Day', 20, yPos);
+    pdf.text('Taken', 80, yPos);
+    pdf.text('Missed', 120, yPos);
+    pdf.text('Rate', 160, yPos);
+
+    yPos += 4;
+    pdf.setFont(undefined, 'normal');
+
+    if (weeklyData.dailyBreakdown && weeklyData.dailyBreakdown.length > 0) {
+        weeklyData.dailyBreakdown.forEach((day, index) => {
+            if (yPos > 250) {
+                pdf.addPage();
+                yPos = 20;
+            }
+            
+            const bgColor = index % 2 === 0 ? [249, 250, 251] : [255, 255, 255];
+            pdf.setFillColor(...bgColor);
+            pdf.rect(15, yPos, pageWidth - 30, 8, 'F');
+            
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(day.date, 20, yPos + 5);
+            
+            pdf.setTextColor(34, 197, 94);
+            pdf.text(String(day.taken), 80, yPos + 5);
+            
+            pdf.setTextColor(239, 68, 68);
+            pdf.text(String(day.missed), 120, yPos + 5);
+            
+            const rate = day.total > 0 ? Math.round((day.taken / day.total) * 100) : 0;
+            pdf.setTextColor(rate >= 80 ? [34, 197, 94] : rate >= 50 ? [234, 179, 8] : [239, 68, 68]);
+            pdf.text(`${rate}%`, 160, yPos + 5);
+            
+            yPos += 8;
+        });
+    } else {
+        pdf.setTextColor(128, 128, 128);
+        pdf.text('No daily data available for this week', 20, yPos + 5);
+        yPos += 10;
+    }
+
+    // Medicine Performance Section
+    if (yPos > 200) {
+        pdf.addPage();
+        yPos = 20;
+    } else {
+        yPos += 10;
+    }
+
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('💊 Medicine Performance', 15, yPos);
+
+    yPos += 10;
+    pdf.setFontSize(10);
+    pdf.setFont(undefined, 'normal');
+
+    if (weeklyData.medicineStats && weeklyData.medicineStats.length > 0) {
+        weeklyData.medicineStats.forEach((med, index) => {
+            if (yPos > 260) {
+                pdf.addPage();
+                yPos = 20;
+            }
+
+            // Medicine card
+            pdf.setFillColor(249, 250, 251);
+            pdf.roundedRect(15, yPos, pageWidth - 30, 20, 2, 2, 'F');
+
+            // Medicine name
+            pdf.setFont(undefined, 'bold');
+            pdf.setTextColor(0, 0, 0);
+            pdf.text(med.name, 20, yPos + 6);
+
+            // Adherence bar
+            const barWidth = 100;
+            const barHeight = 4;
+            const adherenceWidth = (med.adherenceRate / 100) * barWidth;
+            
+            pdf.setFillColor(229, 231, 235);
+            pdf.roundedRect(20, yPos + 10, barWidth, barHeight, 2, 2, 'F');
+            
+            const barColor = med.adherenceRate >= 80 ? [34, 197, 94] : med.adherenceRate >= 50 ? [234, 179, 8] : [239, 68, 68];
+            pdf.setFillColor(...barColor);
+            pdf.roundedRect(20, yPos + 10, adherenceWidth, barHeight, 2, 2, 'F');
+
+            // Stats
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(107, 114, 128);
+            pdf.text(`${med.taken}/${med.total} doses`, 125, yPos + 13);
+            
+            pdf.setFont(undefined, 'bold');
+            pdf.setTextColor(...barColor);
+            pdf.text(`${med.adherenceRate}%`, pageWidth - 30, yPos + 13);
+
+            yPos += 25;
+        });
+    } else {
+        pdf.setTextColor(128, 128, 128);
+        pdf.text('No medicine data available', 20, yPos);
+        yPos += 10;
+    }
+
+    // AI Insights Section
+    if (yPos > 200) {
+        pdf.addPage();
+        yPos = 20;
+    } else {
+        yPos += 10;
+    }
+
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('🧠 AI Health Insights', 15, yPos);
+
+    yPos += 10;
+    pdf.setFontSize(10);
+    pdf.setFont(undefined, 'normal');
+
+    if (weeklyData.insights && weeklyData.insights.length > 0) {
+        weeklyData.insights.forEach((insight, index) => {
+            if (yPos > 250) {
+                pdf.addPage();
+                yPos = 20;
+            }
+
+            const priorityColors = {
+                high: [239, 68, 68],
+                medium: [234, 179, 8],
+                low: [34, 197, 94]
+            };
+
+            const priorityColor = priorityColors[insight.priority] || [107, 114, 128];
+
+            pdf.setFillColor(249, 250, 251);
+            pdf.roundedRect(15, yPos, pageWidth - 30, 25, 2, 2, 'F');
+
+            // Priority badge
+            pdf.setFillColor(...priorityColor);
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFont(undefined, 'bold');
+            pdf.setFontSize(8);
+            pdf.roundedRect(20, yPos + 5, 20, 5, 1, 1, 'F');
+            pdf.text(insight.priority.toUpperCase(), 30, yPos + 8.5, { align: 'center' });
+
+            // Category
+            pdf.setTextColor(107, 114, 128);
+            pdf.text(insight.category, 45, yPos + 8.5);
+
+            // Insight text
+            pdf.setFontSize(10);
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(0, 0, 0);
+            const splitText = pdf.splitTextToSize(insight.text, pageWidth - 50);
+            pdf.text(splitText, 20, yPos + 15);
+
+            yPos += 30;
+        });
+    } else {
+        pdf.setTextColor(128, 128, 128);
+        pdf.text('AI is analyzing your data. Check back soon for personalized insights!', 20, yPos);
+        yPos += 10;
+    }
+
+    // Recommendations Section
+    if (yPos > 220) {
+        pdf.addPage();
+        yPos = 20;
+    } else {
+        yPos += 10;
+    }
+
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(16);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('💡 Recommendations', 15, yPos);
+
+    yPos += 10;
+    pdf.setFontSize(10);
+    pdf.setFont(undefined, 'normal');
+
+    const recommendations = [
+        `Keep up your ${weeklyData.adherenceRate || 0}% adherence rate! Consistency is key to better health outcomes.`,
+        'Set daily reminders at consistent times to build a routine.',
+        'Track any side effects and discuss them with your healthcare provider.',
+        'Stay hydrated and maintain regular meal times for better medication absorption.',
+        'Download your reports regularly to share with your doctor during appointments.'
+    ];
+
+    recommendations.forEach((rec, index) => {
+        if (yPos > 270) {
+            pdf.addPage();
+            yPos = 20;
+        }
+        
+        pdf.setTextColor(99, 102, 241);
+        pdf.text('•', 20, yPos);
+        
+        pdf.setTextColor(0, 0, 0);
+        const splitRec = pdf.splitTextToSize(rec, pageWidth - 45);
+        pdf.text(splitRec, 25, yPos);
+        
+        yPos += (splitRec.length * 5) + 3;
+    });
+
+    // Footer with branding
+    const footerY = pageHeight - 15;
+    pdf.setFillColor(99, 102, 241);
+    pdf.rect(0, footerY, pageWidth, 15, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(9);
+    pdf.setFont(undefined, 'normal');
+    pdf.text('Generated by CareSphere - AI-Powered Health Management', pageWidth / 2, footerY + 6, { align: 'center' });
+    pdf.text('🔒 Confidential Medical Document', pageWidth / 2, footerY + 11, { align: 'center' });
+
+    // Save the PDF
+    pdf.save(`CareSphere_Weekly_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+};

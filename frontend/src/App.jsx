@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 
 import Home from "./pages/HomePage";
@@ -17,32 +17,41 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import MedicineReminderToast from "./components/MedicineReminderToast";
 import GoogleSuccess from "./pages/GoogleSuccess.jsx";
+
+// Set up foreground notification listener at module level (runs once on load)
+// Use window object to persist flag across hot reloads
+if (!window.__FCM_LISTENER_REGISTERED__ && messaging) {
+  onMessage(messaging, (payload) => {
+    console.log("✅ [FOREGROUND] FCM message received:", payload);
+
+    const { title, body, medicineId } = payload.data || {};
+    if (!medicineId) {
+      console.log("⚠️ No medicineId in payload, skipping notification");
+      return;
+    }
+
+    toast.info(
+      <MedicineReminderToast
+        title={title || "💊 Medicine Reminder"}
+        body={body || "Time to take your medicine!"}
+        medicineId={medicineId}
+      />,
+      { autoClose: false, closeOnClick: false }
+    );
+  });
+  
+  window.__FCM_LISTENER_REGISTERED__ = true;
+  console.log("✅ [SETUP] Foreground notification listener registered");
+}
+
 function ChatbotWrapper() {
   const location = useLocation();
   const { user, token } = useContext(UserContext);
 
-  useEffect(() => {
-    if (location.pathname !== "/patient") return;
-
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground FCM message received:", payload);
-
-      // Use data payload from backend (data-only message)
-      const { title, body, medicineId } = payload.data || {};
-
-      if (!medicineId) return; // skip invalid messages
-
-      toast.info(
-        <MedicineReminderToast title={title || "💊 Medicine Reminder"} body={body || ""} medicineId={medicineId} />,
-        { autoClose: false, closeOnClick: false }
-      );
-    });
-
-    return () => unsubscribe();
-  }, [location.pathname]);
-
+ 
   if (location.pathname !== "/patient") return null;
 
+  
   if (!user || !token) {
     return (
       <p className="text-center text-red-500 mt-4">
@@ -55,16 +64,6 @@ function ChatbotWrapper() {
 }
 
 function App() {
-  useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/firebase-messaging-sw.js")
-        .then((reg) => console.log("Service Worker registered:", reg))
-        .catch((err) => console.error("SW registration failed:", err));
-    }
-
-  }, []);
-
   return (
     <UserProvider>
       <Router>
@@ -75,9 +74,10 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
-           <Route path="/google-success" element={<GoogleSuccess />} />
+          <Route path="/doctor" element={<DoctorDashboard />} />
+          <Route path="/google-success" element={<GoogleSuccess />} />
         </Routes>
-        <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
+        <ChatbotWrapper />
         <ToastContainer position="top-right" />
       </Router>
     </UserProvider>
@@ -85,3 +85,4 @@ function App() {
 }
 
 export default App;
+

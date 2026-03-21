@@ -15,6 +15,9 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Track shown notifications to prevent duplicates
+const shownNotifications = new Set();
+
 // Handle background messages
 messaging.onBackgroundMessage(function(payload) {
   console.log('[SW] Background message received:', payload);
@@ -25,17 +28,34 @@ messaging.onBackgroundMessage(function(payload) {
   const title = data.title || '💊 Medicine Reminder';
   const body = data.body || '';
 
+  // Create unique ID for this notification
+  const notificationId = `${medicineId}-${Date.now()}`;
+  
+  // Check if we've already shown this notification recently (within 5 seconds)
+  const recentNotificationKey = `${medicineId}-${Math.floor(Date.now() / 5000)}`;
+  if (shownNotifications.has(recentNotificationKey)) {
+    console.log('[SW] Duplicate notification detected, skipping');
+    return;
+  }
+  
+  shownNotifications.add(recentNotificationKey);
+  
+  // Clean up old entries after 10 seconds
+  setTimeout(() => {
+    shownNotifications.delete(recentNotificationKey);
+  }, 10000);
+
   const notificationOptions = {
     body,
     icon: '/logo192.png',
+    tag: medicineId, // Use tag to replace existing notifications for same medicine
+    requireInteraction: true,
     data, // keep all fields for click actions
-    actions: [
-      
-    ]
+    actions: []
   };
 
   // Show system notification
-  self.registration.showNotification(title, notificationOptions);
+  return self.registration.showNotification(title, notificationOptions);
 });
 
 // Handle notification click actions
@@ -59,7 +79,3 @@ self.addEventListener('notificationclick', function(event) {
   event.notification.close();
 });
 
-// Optional: Listen for push events to log any raw payloads
-self.addEventListener('push', function(event) {
-  console.log('[SW] Raw push event:', event);
-});

@@ -20,7 +20,14 @@ async function sendNotification(token, medicine) {
 }
 
 /* 🕒 Minute Cron */
+let cronJobStarted = false; // Prevent duplicate cron jobs
+
 const sendnoti = () => {
+  if (cronJobStarted) {
+    console.log("⚠️ Notification cron already running, skipping duplicate");
+    return;
+  }
+
   cron.schedule("* * * * *", async () => {
     const now = new Date();
 
@@ -75,7 +82,8 @@ const sendnoti = () => {
     }
   });
 
-  console.log("🕐 Minute notification cron scheduled.");
+  cronJobStarted = true;
+  console.log("✅ Minute notification cron scheduled (will run every minute)");
 };
 
 export { sendnoti };

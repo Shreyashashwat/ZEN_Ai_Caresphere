@@ -112,10 +112,21 @@ const CalenderView = () => {
 
       {error && (
         <div className="mx-4 mt-4 rounded-xl border-2 border-red-200 bg-red-50 p-4 sm:mx-8">
-          <div className="flex items-center gap-2 text-red-700">
+          <div className="mb-3 flex items-center gap-2 text-red-700">
             <span className="text-xl">⚠️</span>
             <span className="font-semibold">{error}</span>
           </div>
+          {error.includes("No Google Calendar linked") && (
+            <button
+              onClick={() => {
+                window.location.href = "http://localhost:8000/api/v1/auth/google";
+              }}
+              className="mt-3 flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-bold text-white transition-all duration-300 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg active:scale-95"
+            >
+              <span className="text-lg">🔗</span>
+              Connect to Google Calendar
+            </button>
+          )}
         </div>
       )}
 

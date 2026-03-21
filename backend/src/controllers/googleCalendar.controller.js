@@ -1,6 +1,5 @@
 import { google } from "googleapis";
-
-
+import { User } from "../model/user.model.js";
 import { Calendar } from "../model/calendar.model.js";
 import { Reminder } from "../model/reminderstatus.js";
 

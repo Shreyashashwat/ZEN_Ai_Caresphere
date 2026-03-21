@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateStatsReport } from '../utils/reportGenerator';
+import { generateStatsReport, generateWeeklyReport } from '../utils/reportGenerator';
 
 import MedicineList from "../components/MedicineList";
 import MedicineForm from "../components/MedicineForm";
@@ -41,6 +41,19 @@ const Patient = () => {
   const [showAptModal, setShowAptModal] = useState(false);
   const [aptDoctor, setAptDoctor] = useState(null);
   const [aptForm, setAptForm] = useState({ date: "", time: "", problem: "" });
+
+  // Activity Log States for Large Data
+  const [activityLogPage, setActivityLogPage] = useState(1);
+  const [activityLogItemsPerPage, setActivityLogItemsPerPage] = useState(15);
+  const [activityLogFilter, setActivityLogFilter] = useState("all"); // all, taken, missed
+  const [activityLogSearch, setActivityLogSearch] = useState("");
+  const [activityLogSort, setActivityLogSort] = useState("newest"); // newest, oldest
+
+  // Treatment Overview States for Large Data
+  const [treatmentOverviewPage, setTreatmentOverviewPage] = useState(1);
+  const [treatmentOverviewItemsPerPage, setTreatmentOverviewItemsPerPage] = useState(6);
+  const [treatmentOverviewSearch, setTreatmentOverviewSearch] = useState("");
+  const [treatmentOverviewSort, setTreatmentOverviewSort] = useState("name"); // name, adherence
 
   const user = JSON.parse(localStorage.getItem("user"));
   const username = user?.username || "User";
@@ -89,6 +102,55 @@ const Patient = () => {
     generateStatsReport(statsData, username);
   };
 
+  const handleDownloadWeeklyReport = () => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    
+    const weeklyHistory = history.filter(h => new Date(h.time) >= sevenDaysAgo);
+    
+    const dailyData = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      const dayHistory = weeklyHistory.filter(h => {
+        const hDate = new Date(h.time);
+        return hDate.toDateString() === date.toDateString();
+      });
+      
+      dailyData.push({
+        date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        taken: dayHistory.filter(h => h.status === 'taken').length,
+        missed: dayHistory.filter(h => h.status === 'missed').length,
+        total: dayHistory.length,
+      });
+    }
+    
+    const weeklyStats = {
+      totalMedicines: medicines.length,
+      weeklyTaken: weeklyHistory.filter(h => h.status === 'taken').length,
+      weeklyMissed: weeklyHistory.filter(h => h.status === 'missed').length,
+      weeklyAdherence: weeklyHistory.length > 0
+        ? Math.round((weeklyHistory.filter(h => h.status === 'taken').length / weeklyHistory.length) * 100)
+        : 0,
+      dailyBreakdown: dailyData,
+      medicinePerformance: medicines.map(med => {
+        const medWeeklyHistory = weeklyHistory.filter(h => h.medicineId?._id === med._id || h.medicineId === med._id);
+        const taken = medWeeklyHistory.filter(h => h.status === 'taken').length;
+        const total = medWeeklyHistory.length;
+        return {
+          name: med.medicineName,
+          taken,
+          missed: medWeeklyHistory.filter(h => h.status === 'missed').length,
+          total,
+          adherence: total > 0 ? Math.round((taken / total) * 100) : 0,
+        };
+      }).filter(med => med.total > 0),
+    };
+    
+    generateWeeklyReport(weeklyStats, username);
+  };
+
   // const fetchHistoryData = async () => {
   //   try {
   //     const res = await fetchHistory();
@@ -128,7 +190,25 @@ const fetchHistoryData = async () => {
     console.log("🔍 [Patient] All statuses:", [...new Set(historyArray.map(h => h.status))]); // unique statuses
     console.log("🔍 [Patient] Records with no status:", historyArray.filter(h => !h.status).length);
 
-    const sorted = historyArray
+    // Filter out AI pre-reminders (15 min before main reminder)
+    const filterOutPreReminders = (historyList) => {
+      return historyList.filter(historyItem => {
+        const itemTime = new Date(historyItem.time).getTime();
+        const hasMainReminder = historyList.some(h => {
+          const hTime = new Date(h.time).getTime();
+          const timeDiff = hTime - itemTime;
+          // Check if there's a reminder 15 minutes after this one for the same medicine
+          return timeDiff === 900000 && 
+                 (h.medicineId?._id || h.medicineId) === (historyItem.medicineId?._id || historyItem.medicineId);
+        });
+        return !hasMainReminder;
+      });
+    };
+
+    const filtered = filterOutPreReminders(historyArray);
+    console.log("🔍 [Patient] After filtering pre-reminders:", filtered.length);
+
+    const sorted = filtered
       .map(h => ({ ...h, status: h.status?.toLowerCase() }))
       .sort((a, b) => new Date(b.time) - new Date(a.time));
 
@@ -185,7 +265,22 @@ const fetchHistoryData = async () => {
 
   useEffect(() => {
     const now = new Date();
-    const upcoming = reminders
+    // Filter out AI pre-reminders for next reminder display
+    const filterOutPreReminders = (remindersList) => {
+      return remindersList.filter(reminder => {
+        const reminderTime = new Date(reminder.time).getTime();
+        const hasMainReminder = remindersList.some(r => {
+          const rTime = new Date(r.time).getTime();
+          const timeDiff = rTime - reminderTime;
+          return timeDiff === 900000 && 
+                 (r.medicineId?._id || r.medicineId) === (reminder.medicineId?._id || reminder.medicineId);
+        });
+        return !hasMainReminder;
+      });
+    };
+    
+    const filteredReminders = filterOutPreReminders(reminders);
+    const upcoming = filteredReminders
       .filter((r) => r.medicineId)
       .find((r) => new Date(r.time) >= now && r.status === "pending");
     setNextReminder(upcoming || null);
@@ -235,21 +330,115 @@ const fetchHistoryData = async () => {
     navigate("/");
   };
 
+  // Activity Log Processing Functions
+  const getFilteredAndSearchedHistory = () => {
+    let filtered = history;
+
+    // Filter by status
+    if (activityLogFilter !== "all") {
+      filtered = filtered.filter(h => h.status === activityLogFilter);
+    }
+
+    // Filter by search term
+    if (activityLogSearch.trim()) {
+      filtered = filtered.filter(h =>
+        h.medicineId?.medicineName?.toLowerCase().includes(activityLogSearch.toLowerCase())
+      );
+    }
+
+    // Sort
+    if (activityLogSort === "oldest") {
+      filtered = filtered.sort((a, b) => new Date(a.time) - new Date(b.time));
+    } else {
+      filtered = filtered.sort((a, b) => new Date(b.time) - new Date(a.time));
+    }
+
+    return filtered;
+  };
+
+  const filteredActivityLog = getFilteredAndSearchedHistory();
+  const totalActivityRecords = filteredActivityLog.length;
+  const totalActivityPages = Math.ceil(totalActivityRecords / activityLogItemsPerPage);
+  const activityLogStartIndex = (activityLogPage - 1) * activityLogItemsPerPage;
+  const activityLogEndIndex = activityLogStartIndex + activityLogItemsPerPage;
+  const paginatedActivityLog = filteredActivityLog.slice(activityLogStartIndex, activityLogEndIndex);
+
+  // Reset to page 1 when filter or search changes
+  useEffect(() => {
+    setActivityLogPage(1);
+  }, [activityLogFilter, activityLogSearch, activityLogSort]);
+
+  // Treatment Overview Processing Functions
+  const getFilteredAndSortedMedicines = () => {
+    let filtered = medicines;
+
+    // Filter by search term
+    if (treatmentOverviewSearch.trim()) {
+      filtered = filtered.filter(m =>
+        m.medicineName?.toLowerCase().includes(treatmentOverviewSearch.toLowerCase())
+      );
+    }
+
+    // Sort
+    if (treatmentOverviewSort === "adherence") {
+      filtered = filtered.sort((a, b) => {
+        const aHistory = history.filter(h => h.medicineId?._id === a._id || h.medicineId === a._id);
+        const bHistory = history.filter(h => h.medicineId?._id === b._id || h.medicineId === b._id);
+        const aRate = aHistory.length > 0 ? aHistory.filter(h => h.status === "taken").length / aHistory.length : 0;
+        const bRate = bHistory.length > 0 ? bHistory.filter(h => h.status === "taken").length / bHistory.length : 0;
+        return bRate - aRate; // Highest adherence first
+      });
+    } else {
+      filtered = filtered.sort((a, b) => a.medicineName.localeCompare(b.medicineName));
+    }
+
+    return filtered;
+  };
+
+  const filteredTreatmentMedicines = getFilteredAndSortedMedicines();
+  const totalTreatmentRecords = filteredTreatmentMedicines.length;
+  const totalTreatmentPages = Math.ceil(totalTreatmentRecords / treatmentOverviewItemsPerPage);
+  const treatmentStartIndex = (treatmentOverviewPage - 1) * treatmentOverviewItemsPerPage;
+  const treatmentEndIndex = treatmentStartIndex + treatmentOverviewItemsPerPage;
+  const paginatedTreatmentMedicines = filteredTreatmentMedicines.slice(treatmentStartIndex, treatmentEndIndex);
+
+  // Reset to page 1 when filter or search changes
+  useEffect(() => {
+    setTreatmentOverviewPage(1);
+  }, [treatmentOverviewSearch, treatmentOverviewSort]);
+
   // Calculate stats for quick view
   const adherenceRate = history.length > 0 
     ? Math.round((history.filter(h => h.status === 'taken').length / history.length) * 100)
     : 0;
-  const todayReminders = reminders.filter(r => {
+  
+  // Filter out AI-adjusted pre-reminders (reminders created 15 min before the actual dose)
+  const filterOutPreReminders = (remindersList) => {
+    return remindersList.filter(reminder => {
+      // Check if there's another reminder for the same medicine exactly 15 minutes after this one
+      const reminderTime = new Date(reminder.time).getTime();
+      const hasMainReminder = remindersList.some(r => {
+        const rTime = new Date(r.time).getTime();
+        const timeDiff = rTime - reminderTime;
+        // If there's a reminder 15 minutes (900000ms) after this one for the same medicine, this is a pre-reminder
+        return timeDiff === 900000 && 
+               (r.medicineId?._id || r.medicineId) === (reminder.medicineId?._id || reminder.medicineId);
+      });
+      return !hasMainReminder; // Keep only if it's NOT a pre-reminder
+    });
+  };
+  
+  const todayReminders = filterOutPreReminders(reminders.filter(r => {
     const rDate = new Date(r.time);
     const today = new Date();
     return rDate.toDateString() === today.toDateString();
-  }).length;
+  })).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* ENHANCED HEADER */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl shadow-md border-b border-indigo-100">
-        <div className="max-w-7xl mx-auto flex justify-between items-center px-8 py-5">
+        <div className="max-w-7xl mx-auto flex justify-between items-center px-4 py-5">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
               <span className="text-white text-2xl font-extrabold">C</span>
@@ -315,12 +504,12 @@ const fetchHistoryData = async () => {
       </header>
 
       {/* ENHANCED WELCOME BANNER */}
-      <section className="max-w-7xl mx-auto px-8 py-8 mt-8">
+      <section className="max-w-7xl mx-auto px-4 py-8 mt-8">
         <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-700 text-white rounded-[2rem] shadow-2xl shadow-indigo-300/50 overflow-hidden relative animate-fadeIn">
           <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-24 translate-x-24"></div>
           <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
           
-          <div className="relative px-10 py-12 md:px-12 md:py-14">
+          <div className="relative px-6 py-12 md:px-8 md:py-14">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
               <div className="flex-1">
                 <div className="flex items-center gap-4 mb-3">
@@ -363,7 +552,7 @@ const fetchHistoryData = async () => {
       </section>
 
       {activeTab === "home" ? (
-        <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
           {/* DOCTOR NETWORK - ENHANCED */}
           <section>
             <div className="flex items-center justify-between mb-6">
@@ -454,7 +643,7 @@ const fetchHistoryData = async () => {
             </div>
             
             <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 animate-fadeIn hover:shadow-2xl transition-all duration-300 hover:-translate-y-1" style={{animationDelay: '0.1s'}}>
-              <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 <MedicineList
                   medicines={medicines}
                   reminders={reminders}
@@ -475,7 +664,7 @@ const fetchHistoryData = async () => {
         
       ) : activeTab === "history" ? (
         /* MEDICATION HISTORY SECTION - ENHANCED */
-        <section className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-fadeIn">
+        <section className="max-w-7xl mx-auto px-4 py-8 space-y-6 animate-fadeIn">
           <div className="bg-white rounded-3xl shadow-2xl border-2 border-blue-100 overflow-hidden">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-6 border-b border-blue-200">
@@ -490,6 +679,13 @@ const fetchHistoryData = async () => {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleDownloadWeeklyReport}
+                    className="group px-4 py-2.5 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-2 border border-white/30 hover:border-white/50"
+                  >
+                    <span className="text-base">📊</span>
+                    Weekly
+                  </button>
                   <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/30">
                     <div className="text-xs text-blue-100 font-semibold">Total Records</div>
                     <div className="text-xl font-black text-white">{history.length}</div>
@@ -617,7 +813,7 @@ const fetchHistoryData = async () => {
         
       ) : activeTab === "family" ? (
         /* FAMILY CIRCLE - FROM SECOND FILE */
-        <section className="max-w-5xl mx-auto px-6 py-12 space-y-8">
+        <section className="max-w-5xl mx-auto px-4 py-12 space-y-8">
           {/* Pending Invites Section */}
           <div className="bg-white rounded-3xl shadow-xl border border-amber-100 overflow-hidden">
             <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
@@ -658,7 +854,7 @@ const fetchHistoryData = async () => {
         
       ) : activeTab === "stats" ? (
         /* PREMIUM VITAL STATISTICS SECTION - FROM SECOND FILE */
-        <section className="max-w-7xl mx-auto px-6 py-12 space-y-10">
+        <section className="max-w-7xl mx-auto px-4 py-12 space-y-10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
               <h2 className="text-4xl font-black text-indigo-900 tracking-tight flex items-center gap-3">
@@ -666,13 +862,22 @@ const fetchHistoryData = async () => {
               </h2>
               <p className="text-gray-500 font-medium ml-1 mt-1 uppercase text-[10px] tracking-[0.2em]">Comprehensive Health Analysis Profile</p>
             </div>
-            <button
-              onClick={handleDownloadReport}
-              className="group px-6 py-3.5 bg-indigo-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-indigo-700 transition-all flex items-center gap-3 shadow-xl shadow-indigo-200 hover:shadow-indigo-300 active:scale-95"
-            >
-              <span className="text-lg group-hover:animate-bounce">📥</span>
-              Export Clinical Report
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleDownloadWeeklyReport}
+                className="group px-6 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-[1.25rem] font-black text-sm hover:from-purple-700 hover:to-pink-700 transition-all flex items-center gap-3 shadow-xl shadow-purple-200 hover:shadow-purple-300 active:scale-95"
+              >
+                <span className="text-lg group-hover:animate-bounce">📊</span>
+                Weekly Report
+              </button>
+              <button
+                onClick={handleDownloadReport}
+                className="group px-6 py-3.5 bg-indigo-600 text-white rounded-[1.25rem] font-black text-sm hover:bg-indigo-700 transition-all flex items-center gap-3 shadow-xl shadow-indigo-200 hover:shadow-indigo-300 active:scale-95"
+              >
+                <span className="text-lg group-hover:animate-bounce">📥</span>
+                Full Report
+              </button>
+            </div>
           </div>
 
           {/* Quick Stats Grid */}
@@ -706,78 +911,231 @@ const fetchHistoryData = async () => {
                   <h3 className="text-xl font-black text-indigo-900 uppercase tracking-tighter">📈 Weekly Performance</h3>
                   <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase">Live Update</div>
                 </div>
-                <div className="h-[350px]">
+                <div className="h-[350px] flex items-center justify-center">
                   <DashboardChart key={refreshTrigger + "stats"} history={history} />
                 </div>
               </div>
 
               {/* Medicine Breakdown */}
-              <div className="bg-white/60 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-2xl border border-white/40 ring-1 ring-black/5">
-                <h3 className="text-xl font-black text-indigo-900 uppercase tracking-tighter mb-8">💊 Treatment Overview</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {medicines.map((med) => {
-                    const medHistory = history.filter(h => h.medicineId?._id === med._id || h.medicineId === med._id);
-                    const medTaken = medHistory.filter(h => h.status === "taken").length;
-                    const medTotal = medHistory.length;
-                    const medRate = medTotal > 0 ? Math.round((medTaken / medTotal) * 100) : 0;
-
-                    return (
-                      <div key={med._id} className="bg-white/80 p-6 rounded-3xl shadow-lg border border-indigo-50 group hover:border-indigo-200 transition-colors">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="font-black text-indigo-900 text-lg">{med.medicineName}</h4>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{med.dosage}</p>
-                          </div>
-                          <div className={`px-3 py-1 rounded-full text-xs font-black ${medRate >= 80 ? 'bg-emerald-50 text-emerald-600' : medRate >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
-                            {medRate}%
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-1000 ${medRate >= 80 ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : medRate >= 50 ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-rose-400 to-red-500'}`}
-                              style={{ width: `${medRate}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                            <span>Compliance</span>
-                            <span>{medTaken} / {medTotal} Doses</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className="bg-white/60 backdrop-blur-xl p-10 rounded-[2.5rem] shadow-2xl border border-white/40 ring-1 ring-black/5 flex flex-col h-[700px]">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-black text-indigo-900 uppercase tracking-tighter">💊 Treatment Overview</h3>
+                  <div className="text-[10px] font-bold text-indigo-600">
+                    {paginatedTreatmentMedicines.length > 0 ? treatmentStartIndex + 1 : 0}-{Math.min(treatmentEndIndex, totalTreatmentRecords)} of {totalTreatmentRecords}
+                  </div>
                 </div>
+
+                {/* Search & Sort Controls */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  <input
+                    type="text"
+                    placeholder="Search medicines..."
+                    value={treatmentOverviewSearch}
+                    onChange={(e) => setTreatmentOverviewSearch(e.target.value)}
+                    className="flex-1 min-w-[150px] px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-indigo-400 transition-colors"
+                  />
+
+                  <select
+                    value={treatmentOverviewSort}
+                    onChange={(e) => setTreatmentOverviewSort(e.target.value)}
+                    className="px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-gray-700 focus:outline-none focus:border-indigo-400 transition-colors"
+                  >
+                    <option value="name">Alphabetical</option>
+                    <option value="adherence">Highest Adherence</option>
+                  </select>
+
+                  <select
+                    value={treatmentOverviewItemsPerPage}
+                    onChange={(e) => setTreatmentOverviewItemsPerPage(parseInt(e.target.value))}
+                    className="px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-gray-700 focus:outline-none focus:border-indigo-400 transition-colors"
+                  >
+                    <option value={3}>3 per page</option>
+                    <option value={6}>6 per page</option>
+                    <option value={12}>12 per page</option>
+                  </select>
+                </div>
+
+                {/* Medicine Grid - Scrollable */}
+                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar-light mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {paginatedTreatmentMedicines.length > 0 ? (
+                      paginatedTreatmentMedicines.map((med) => {
+                        const medHistory = history.filter(h => h.medicineId?._id === med._id || h.medicineId === med._id);
+                        const medTaken = medHistory.filter(h => h.status === "taken").length;
+                        const medTotal = medHistory.length;
+                        const medRate = medTotal > 0 ? Math.round((medTaken / medTotal) * 100) : 0;
+
+                        return (
+                          <div key={med._id} className="bg-white/80 p-6 rounded-3xl shadow-lg border border-indigo-50 group hover:border-indigo-200 transition-colors">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h4 className="font-black text-indigo-900 text-lg">{med.medicineName}</h4>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{med.dosage}</p>
+                              </div>
+                              <div className={`px-3 py-1 rounded-full text-xs font-black ${medRate >= 80 ? 'bg-emerald-50 text-emerald-600' : medRate >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {medRate}%
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-1000 ${medRate >= 80 ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : medRate >= 50 ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-rose-400 to-red-500'}`}
+                                  style={{ width: `${medRate}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
+                                <span>Compliance</span>
+                                <span>{medTaken} / {medTotal} Doses</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-full text-center py-12 opacity-40 italic text-sm">
+                        No medicines found
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalTreatmentPages > 1 && (
+                  <div className="border-t border-indigo-100 pt-4 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setTreatmentOverviewPage(p => Math.max(1, p - 1))}
+                      disabled={treatmentOverviewPage === 1}
+                      className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold text-indigo-700 transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="text-xs font-bold text-indigo-600">
+                      {treatmentOverviewPage} / {totalTreatmentPages}
+                    </span>
+                    <button
+                      onClick={() => setTreatmentOverviewPage(p => Math.min(totalTreatmentPages, p + 1))}
+                      disabled={treatmentOverviewPage === totalTreatmentPages}
+                      className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold text-indigo-700 transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Side Terminal: Activity Log */}
             <div className="space-y-8">
-              <div className="bg-indigo-900 text-white p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+              <div className="bg-indigo-900 text-white p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group flex flex-col h-[700px]">
                 <div className="absolute -right-10 -bottom-10 text-9xl text-white opacity-5 rotate-12 transition-transform duration-700 group-hover:rotate-0">📋</div>
-                <div className="relative z-10">
-                  <h3 className="text-lg font-black uppercase tracking-widest mb-6 flex items-center gap-2">
+                <div className="relative z-10 flex-1 flex flex-col">
+                  <h3 className="text-lg font-black uppercase tracking-widest mb-4 flex items-center gap-2">
                     <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></span>
                     Activity Log
                   </h3>
-                  <div className="space-y-4">
-                    {history.slice(-12).reverse().map((h, i) => (
-                      <div key={i} className="flex items-center gap-4 border-l-2 border-indigo-700/50 pl-4 py-1 hover:border-indigo-400 transition-colors">
-                        <span className="text-xl shrink-0">{h.status === "taken" ? "✅" : "⚠️"}</span>
-                        <div className="min-w-0">
-                          <p className="text-xs font-black truncate text-indigo-50">
-                            {h.medicineId?.medicineName || "Dose"}
-                          </p>
-                          <p className="text-[10px] font-bold text-indigo-300 uppercase leading-none">
-                            {new Date(h.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(h.time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </p>
+
+                  {/* Search Bar */}
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      placeholder="Search medicines..."
+                      value={activityLogSearch}
+                      onChange={(e) => setActivityLogSearch(e.target.value)}
+                      className="w-full px-3 py-2 bg-indigo-800 border border-indigo-600 rounded-lg text-xs text-white placeholder-indigo-400 focus:outline-none focus:border-indigo-400 transition-colors"
+                    />
+                  </div>
+
+                  {/* Filter & Sort Controls */}
+                  <div className="flex gap-2 mb-3 flex-wrap">
+                    <select
+                      value={activityLogFilter}
+                      onChange={(e) => setActivityLogFilter(e.target.value)}
+                      className="px-2 py-1 bg-indigo-800 border border-indigo-600 rounded text-[10px] font-bold text-white focus:outline-none focus:border-indigo-400 transition-colors"
+                    >
+                      <option value="all">All</option>
+                      <option value="taken">✅ Taken</option>
+                      <option value="missed">⚠️ Missed</option>
+                    </select>
+
+                    <select
+                      value={activityLogSort}
+                      onChange={(e) => setActivityLogSort(e.target.value)}
+                      className="px-2 py-1 bg-indigo-800 border border-indigo-600 rounded text-[10px] font-bold text-white focus:outline-none focus:border-indigo-400 transition-colors"
+                    >
+                      <option value="newest">Newest</option>
+                      <option value="oldest">Oldest</option>
+                    </select>
+
+                    <select
+                      value={activityLogItemsPerPage}
+                      onChange={(e) => setActivityLogItemsPerPage(parseInt(e.target.value))}
+                      className="px-2 py-1 bg-indigo-800 border border-indigo-600 rounded text-[10px] font-bold text-white focus:outline-none focus:border-indigo-400 transition-colors ml-auto"
+                    >
+                      <option value={10}>Show 10</option>
+                      <option value={15}>Show 15</option>
+                      <option value={25}>Show 25</option>
+                      <option value={50}>Show 50</option>
+                    </select>
+                  </div>
+
+                  {/* Records Count */}
+                  <div className="text-[10px] font-bold text-indigo-300 mb-2">
+                    Showing {paginatedActivityLog.length > 0 ? activityLogStartIndex + 1 : 0}-{Math.min(activityLogEndIndex, totalActivityRecords)} of {totalActivityRecords} records
+                  </div>
+
+                  {/* Activity List - Scrollable */}
+                  <div className="flex-1 overflow-y-auto space-y-2 mb-3 pr-2 custom-scrollbar-dark scroll-smooth">
+                    {paginatedActivityLog.length > 0 ? (
+                      paginatedActivityLog.map((h, i) => (
+                        <div
+                          key={`${h._id || i}-${activityLogPage}`}
+                          className="flex items-center gap-2 border-l-2 border-indigo-700/50 pl-3 py-2 hover:border-indigo-400 transition-colors bg-indigo-800/30 rounded p-2"
+                        >
+                          <span className="text-lg shrink-0 font-bold">{h.status === "taken" ? "✅" : "⚠️"}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-black truncate text-indigo-50">
+                              {h.medicineId?.medicineName || "Dose"}
+                            </p>
+                            <p className="text-[9px] font-bold text-indigo-300 uppercase leading-none">
+                              {new Date(h.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(h.time).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded whitespace-nowrap ${
+                            h.status === "taken" ? "bg-emerald-500/30 text-emerald-200" : "bg-red-500/30 text-red-200"
+                          }`}>
+                            {h.status === "taken" ? "Taken" : "Missed"}
+                          </span>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 opacity-40 italic text-xs">
+                        No records found
                       </div>
-                    ))}
-                    {history.length === 0 && (
-                      <div className="text-center py-10 opacity-40 italic text-sm">No activity recorded</div>
                     )}
                   </div>
+
+                  {/* Pagination Controls */}
+                  {totalActivityPages > 1 && (
+                    <div className="border-t border-indigo-700/50 pt-3 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => setActivityLogPage(p => Math.max(1, p - 1))}
+                        disabled={activityLogPage === 1}
+                        className="px-2 py-1 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold transition-colors"
+                      >
+                        ← Prev
+                      </button>
+                      <span className="text-xs font-bold">
+                        {activityLogPage} / {totalActivityPages}
+                      </span>
+                      <button
+                        onClick={() => setActivityLogPage(p => Math.min(totalActivityPages, p + 1))}
+                        disabled={activityLogPage === totalActivityPages}
+                        className="px-2 py-1 bg-indigo-800 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold transition-colors"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -809,7 +1167,7 @@ const fetchHistoryData = async () => {
         
       ) : (
         /* HEALTH INSIGHTS - ENHANCED */
-        <section className="max-w-7xl mx-auto px-6 py-8">
+        <section className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">
               🧠
@@ -967,6 +1325,7 @@ const fetchHistoryData = async () => {
 
       {/* Custom Scrollbar Styles */}
       <style jsx>{`
+        /* Light Theme Scrollbar */
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
@@ -980,6 +1339,56 @@ const fetchHistoryData = async () => {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #94a3b8;
+        }
+
+        /* Light Theme Scrollbar for Treatment Overview */
+        .custom-scrollbar-light::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar-light::-webkit-scrollbar-track {
+          background: rgba(79, 70, 229, 0.05);
+          border-radius: 10px;
+        }
+        .custom-scrollbar-light::-webkit-scrollbar-thumb {
+          background: rgba(129, 140, 248, 0.5);
+          border-radius: 10px;
+          transition: background 0.3s ease;
+        }
+        .custom-scrollbar-light::-webkit-scrollbar-thumb:hover {
+          background: rgba(129, 140, 248, 0.8);
+        }
+
+        /* Dark Theme Scrollbar for Activity Log */
+        .custom-scrollbar-dark::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar-dark::-webkit-scrollbar-track {
+          background: rgba(79, 70, 229, 0.1);
+          border-radius: 10px;
+        }
+        .custom-scrollbar-dark::-webkit-scrollbar-thumb {
+          background: rgba(129, 140, 148, 0.6);
+          border-radius: 10px;
+          transition: background 0.3s ease;
+        }
+        .custom-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+          background: rgba(129, 140, 248, 1);
+        }
+
+        /* Smooth Scrolling */
+        .scroll-smooth {
+          scroll-behavior: smooth;
+        }
+
+        /* Firefox Support */
+        .custom-scrollbar-dark {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(129, 140, 248, 0.6) rgba(79, 70, 229, 0.1);
+        }
+
+        .custom-scrollbar-light {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(129, 140, 248, 0.5) rgba(79, 70, 229, 0.05);
         }
       `}</style>
     </div>
