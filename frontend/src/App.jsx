@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from "react-route
 
 import Home from "./pages/HomePage";
 import Patient from "./pages/patient";
-import DoctorDashboard from "./pages/DoctorDashboard";
 import Header from "./components/Header";
 import ChatWidget from "./pages/Chatbot.jsx";
 import About from "./pages/About";
@@ -46,11 +45,9 @@ function ChatbotWrapper() {
 
   if (!user || !token) {
     return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <p className="text-xs text-red-500 bg-white border border-red-200 px-3 py-2 rounded-lg shadow-lg">
-          Log in to chat with AI Assistant 🤖
-        </p>
-      </div>
+      <p className="text-center text-red-500 mt-4">
+        Please log in to use the chatbot.
+      </p>
     );
   }
 
@@ -65,21 +62,21 @@ function App() {
         .then((reg) => console.log("Service Worker registered:", reg))
         .catch((err) => console.error("SW registration failed:", err));
     }
+
   }, []);
 
   return (
     <UserProvider>
       <Router>
         <Header />
-        <Messaging /> 
+        <Messaging /> {/* Requests notification permission */}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
-          <Route path="/doctor" element={<DoctorDashboard />} />
         </Routes>
-        <ChatbotWrapper /> 
+        <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
         <ToastContainer position="top-right" />
       </Router>
     </UserProvider>
