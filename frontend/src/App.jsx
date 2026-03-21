@@ -16,7 +16,7 @@ import { messaging } from "./Firebase/firebase";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import MedicineReminderToast from "./components/MedicineReminderToast";
-
+import GoogleSuccess from "./pages/GoogleSuccess.jsx";
 function ChatbotWrapper() {
   const location = useLocation();
   const { user, token } = useContext(UserContext);
@@ -75,6 +75,7 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
+           <Route path="/google-success" element={<GoogleSuccess />} />
         </Routes>
         <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
         <ToastContainer position="top-right" />

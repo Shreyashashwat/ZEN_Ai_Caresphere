@@ -21,7 +21,13 @@ const userSchema = new Schema(
         },
         password: {
             type: String,
-            required: [true, "Password is required"],
+            required: function () {
+                return !this.hasGoogleAccount;
+            },
+        },
+        hasGoogleAccount: {
+            type: Boolean,
+            default: false,
         },
         age: {
             type: Number,
@@ -38,12 +44,19 @@ const userSchema = new Schema(
             type: String,
             default: null,
         },
+<<<<<<< HEAD
 
 
 
         fcmToken: {
             type: String,
             default: null,
+=======
+        googleTokens: {
+            access_token: { type: String },
+            refresh_token: { type: String },
+            expiry_date: { type: Number },
+>>>>>>> e56d319948efe25fc699c8a4890e2c61522b0fbd
         },
     },
     {

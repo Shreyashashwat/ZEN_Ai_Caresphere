@@ -3,7 +3,6 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { Medicine } from "../model/medicine.model.js";
 
-
 const getHistory = asyncHandler(async (req, res) => {
   const userId = req.user?._id || req.user?.id;
   
