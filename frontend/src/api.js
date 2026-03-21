@@ -16,6 +16,7 @@ API.interceptors.request.use((req) => {
 });
 
 export const loginUser = (data) => API.post("/users/login", data);
+export const loginDoctor = (data) => API.post("/users/login-doctor", data);
 export const registerUser = (data) => API.post("/users/register", data);
 
 
@@ -57,8 +58,5 @@ export const getPendingDoctorRequests = () => API.get("/doctor-request/pending")
 export const acceptDoctorRequest = (requestId) => API.post(`/doctor-request/${requestId}/accept`);
 export const rejectDoctorRequest = (requestId) => API.post(`/doctor-request/${requestId}/reject`);
 export const getDoctorDashboard = () => API.get("/doctor/dashboard");
-export const createAppointment = (data) => API.post(`/doctor-request/createAppointment`, data);
-export const getDoctorAppointments = () => API.get(`/doctor-request/getappointments`);
-export const updateAppointmentStatus = (appointmentId, status) => 
-  API.post(`/doctor-request/appointments/${appointmentId}`, { status });
+
 export default API;
