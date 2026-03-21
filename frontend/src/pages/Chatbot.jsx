@@ -5,13 +5,13 @@ function ChatWidget() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   const storedUser = JSON.parse(localStorage.getItem("user"));
   const userId = storedUser?._id;
   const authToken = storedUser?.token;
 
- 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -19,14 +19,14 @@ function ChatWidget() {
   const toggleChat = () => setIsOpen((prev) => !prev);
 
   const sendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isLoading) return;
 
     const userMessage = { from: "user", text: inputText };
     setMessages((msgs) => [...msgs, userMessage]);
     setInputText("");
+    setIsLoading(true);
 
     try {
-   
       console.log("Sending message with token:", authToken);
 
       const resp = await axios.post(
@@ -46,8 +46,10 @@ function ChatWidget() {
       console.error("Chat API error:", err);
       setMessages((msgs) => [
         ...msgs,
-        { from: "bot", text: "⚠️ Sorry, something went wrong." },
+        { from: "bot", text: "⚠️ Sorry, something went wrong. Please try again." },
       ]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,67 +61,142 @@ function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4">
-  
+    <div className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
+      {/* Chat Toggle Button */}
       <button
         onClick={toggleChat}
-        className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transform transition-all duration-300"
+        className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-blue-500/50 sm:h-16 sm:w-16"
+        aria-label="Toggle chat"
       >
-        {isOpen ? "✖" : "💬"}
+        <span className="text-2xl transition-transform duration-300 group-hover:rotate-12 sm:text-3xl">
+          {isOpen ? "✖️" : "💬"}
+        </span>
+        {!isOpen && (
+          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg">
+            !
+          </span>
+        )}
       </button>
 
-  
+      {/* Chat Window */}
       {isOpen && (
-        <div className="mt-3 w-80 sm:w-96 h-[480px] bg-white shadow-2xl rounded-2xl flex flex-col overflow-hidden border border-gray-200 animate-fadeIn">
+        <div className="absolute bottom-20 right-0 flex h-[500px] w-[340px] flex-col overflow-hidden rounded-3xl border-2 border-blue-100 bg-white shadow-2xl animate-fadeIn sm:h-[550px] sm:w-[400px] lg:w-[450px]">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-3 flex justify-between items-center">
-            <h2 className="font-semibold text-lg">Health Assistant 🤖</h2>
-            <button
-              onClick={toggleChat}
-              className="text-white hover:text-gray-200 text-xl"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {messages.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex ${
-                  m.from === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div
-                  className={`px-4 py-2 rounded-2xl max-w-[75%] text-sm shadow-sm ${
-                    m.from === "user"
-                      ? "bg-blue-500 text-white rounded-br-none"
-                      : "bg-gray-200 text-gray-800 rounded-bl-none"
-                  }`}
-                >
-                  {m.text}
+          <div className="border-b border-blue-100 bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                  <span className="text-xl">🤖</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-extrabold">Health Assistant</h2>
+                  <p className="text-xs text-blue-100">AI-Powered Care</p>
                 </div>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
+              <button
+                onClick={toggleChat}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200 hover:bg-white/20"
+                aria-label="Close chat"
+              >
+                <span className="text-xl">✖️</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Messages Area */}
+          <div className="scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-50 flex-1 overflow-y-auto bg-gradient-to-br from-blue-50/30 via-white to-indigo-50/30 p-4">
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <div className="mb-4 inline-flex rounded-full bg-blue-100 p-4">
+                  <span className="text-4xl">💙</span>
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-gray-800">Welcome to CareSphere</h3>
+                <p className="max-w-[280px] text-sm text-gray-600">
+                  Your AI health assistant is ready to help. Ask me anything about your health, medications, or appointments.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((m, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex animate-fadeIn ${
+                      m.from === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div className="flex max-w-[85%] items-end gap-2">
+                      {m.from === "bot" && (
+                        <div className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-600">
+                          <span className="text-xs">🤖</span>
+                        </div>
+                      )}
+                      <div
+                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-md ${
+                          m.from === "user"
+                            ? "rounded-br-sm bg-gradient-to-r from-blue-500 to-indigo-600 font-medium text-white"
+                            : "rounded-bl-sm border-2 border-blue-100 bg-white font-normal text-gray-800"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                      {m.from === "user" && (
+                        <div className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+                          <span className="text-xs">👤</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex animate-fadeIn justify-start">
+                    <div className="flex items-end gap-2">
+                      <div className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-600">
+                        <span className="text-xs">🤖</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border-2 border-blue-100 bg-white px-4 py-3 shadow-md">
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.3s]"></div>
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-indigo-500 [animation-delay:-0.15s]"></div>
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
           </div>
 
           {/* Input Area */}
-          <div className="p-3 bg-white border-t flex gap-2">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type a message..."
-              className="flex-1 border rounded-xl p-2 h-12 resize-none focus:ring-2 focus:ring-blue-400 focus:outline-none text-sm"
-            />
-            <button
-              onClick={sendMessage}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 rounded-xl transition-all"
-            >
-              Send
-            </button>
+          <div className="border-t-2 border-blue-100 bg-white p-4">
+            <div className="flex items-end gap-2">
+              <div className="relative flex-1">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your message..."
+                  disabled={isLoading}
+                  className="h-12 w-full resize-none rounded-xl border-2 border-blue-200 bg-blue-50/50 px-4 py-3 pr-10 text-sm font-medium text-gray-800 placeholder-gray-500 transition-all duration-200 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  rows="1"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-40">
+                  ✍️
+                </span>
+              </div>
+              <button
+                onClick={sendMessage}
+                disabled={!inputText.trim() || isLoading}
+                className="group flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 font-bold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                aria-label="Send message"
+              >
+                <span className="text-xl transition-transform duration-200 group-hover:translate-x-0.5">
+                  {isLoading ? "⏳" : "📤"}
+                </span>
+              </button>
+            </div>
+            <p className="mt-2 text-center text-xs text-gray-500">
+              Press <kbd className="rounded border border-gray-300 bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Enter</kbd> to send
+            </p>
           </div>
         </div>
       )}

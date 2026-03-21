@@ -29,8 +29,8 @@ class LLMResponse(BaseModel):
 
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-pro",
-    temperature=0.3,
+    model="gemini-flash-latest",
+    temperature=0.7,
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
     
@@ -42,9 +42,10 @@ prompt = PromptTemplate(
 You are a health insights assistant.
 
 Rules:
-- Generate 3 to 5 insights
+- Generate 1 to 5 insights
 - No medical diagnosis
 - Short, actionable sentences
+- Use ONLY these priority values: "high", "medium", "low" (lowercase)
 - Respond ONLY in valid JSON
 
 JSON format:
@@ -54,15 +55,12 @@ Weekly summary:
 - Adherence: {adherence_percentage}%
 - Missed doses: {missed_doses}
 - Most missed time: {most_missed_time}
-- Appointments missed: {appointments_missed}
-- Symptoms: {top_symptoms}
 """,
     input_variables=[
         "adherence_percentage",
         "missed_doses",
         "most_missed_time",
-        "appointments_missed",
-        "top_symptoms"
+        
     ],
     partial_variables={
         "format_instructions": parser.get_format_instructions()

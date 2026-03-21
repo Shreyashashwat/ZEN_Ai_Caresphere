@@ -14,7 +14,7 @@ const InsightSchema = new mongoose.Schema({
     enum: ["low", "medium", "high"],
     default: "medium"
   }
-}, { _id: false }); // Subdocuments typically don't need their own _id
+}, { _id: false });
 
 const WeeklyInsightSchema = new mongoose.Schema({
   user_id: {
@@ -23,7 +23,7 @@ const WeeklyInsightSchema = new mongoose.Schema({
     required: true
   },
   week: {
-    type: String, // Format: "2024-W05" or similar
+    type: String, // Format: "2026-W06"
     required: true
   },
   insights: [InsightSchema],
@@ -33,13 +33,13 @@ const WeeklyInsightSchema = new mongoose.Schema({
   }
 });
 
-// ✅ CORRECT - Index on WeeklyInsightSchema
+// Unique constraint: one insight per user per week
 WeeklyInsightSchema.index(
   { user_id: 1, week: 1 },
   { unique: true }
 );
 
-// Add index for querying by user
+// Index for querying user's insights
 WeeklyInsightSchema.index({ user_id: 1, created_at: -1 });
 
 export const WeeklyInsight = mongoose.model("WeeklyInsight", WeeklyInsightSchema);

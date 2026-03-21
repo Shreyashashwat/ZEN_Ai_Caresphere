@@ -181,122 +181,214 @@ const MedicineForm = ({ onSuccess, medicine }) => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-lg mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-5"
+      className="mx-auto max-w-2xl animate-fadeIn overflow-hidden rounded-3xl border-2 border-blue-100 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50 shadow-2xl backdrop-blur-sm transition-all duration-300 hover:shadow-3xl"
     >
-      <h2 className="text-2xl font-semibold text-gray-700 text-center">
-        {isEditing ? "Update Medicine" : "Add Medicine"}
-      </h2>
-
-      <div>
-        <input
-          type="text"
-          name="medicineName"
-          placeholder="Medicine Name"
-          value={formData.medicineName}
-          onChange={handleChange}
-          className={`w-full border rounded-lg p-2 focus:ring focus:ring-blue-300 ${
-            medicineValid ? "" : "border-red-500"
-          }`}
-          required
-        />
-        {!medicineValid && (
-          <p className="text-red-500 text-sm mt-1">Medicine not recognized</p>
-        )}
-        {checkingMedicine && (
-          <p className="text-gray-500 text-sm mt-1">Checking medicine...</p>
-        )}
+      <div className="border-b border-blue-100 bg-gradient-to-r from-blue-500 to-indigo-600 px-8 py-6 text-white">
+        <div className="mb-2 inline-flex rounded-full bg-white/20 px-3 py-1 backdrop-blur-sm">
+          <span className="text-xs font-bold uppercase tracking-wide">
+            {isEditing ? "✏️ Edit Mode" : "💊 New Entry"}
+          </span>
+        </div>
+        <h2 className="text-2xl font-extrabold sm:text-3xl">
+          {isEditing ? "Update Medication" : "Add New Medication"}
+        </h2>
+        <p className="mt-1 text-sm text-blue-100">
+          AI-powered medication management for better health outcomes
+        </p>
       </div>
 
-      <input
-        type="text"
-        name="dosage"
-        placeholder="Dosage (e.g., 500mg)"
-        value={formData.dosage}
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
-        required
-      />
-
-      <div className="space-y-2">
-        <label className="block text-gray-700 font-medium">Time(s):</label>
-        {formData.time.map((t, index) => (
-          <div key={index} className="flex items-center gap-2">
+      <div className="space-y-6 p-8">
+        <div className="group">
+          <label className="mb-2 block text-sm font-bold text-gray-800">
+            Medicine Name <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
             <input
-              type="time"
-              value={t}
-              onChange={(e) => handleTimeChange(index, e.target.value)}
-              className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+              type="text"
+              name="medicineName"
+              placeholder="e.g., Aspirin, Metformin, Lisinopril"
+              value={formData.medicineName}
+              onChange={handleChange}
+              className={`w-full rounded-xl border-2 px-4 py-3.5 font-medium shadow-sm transition duration-200 focus:outline-none focus:ring-4 ${
+                medicineValid
+                  ? "border-blue-200 bg-white focus:border-blue-400 focus:ring-blue-100"
+                  : "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100"
+              }`}
               required
             />
-            {formData.time.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeTimeField(index)}
-                className="text-red-500 hover:text-red-700"
-              >
-                ✖
-              </button>
+            {checkingMedicine && (
+              <div className="absolute right-3 top-3.5 flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></span>
+                <span className="text-xs font-semibold text-blue-700">Validating...</span>
+              </div>
             )}
           </div>
-        ))}
-        <button
-          type="button"
-          onClick={addTimeField}
-          className="text-blue-500 hover:text-blue-700 text-sm font-medium"
-        >
-          + Add another time
-        </button>
-      </div>
+          {!medicineValid && (
+            <div className="mt-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition-all">
+              <span className="text-base">⚠️</span> 
+              <span>Medicine not found in our database</span>
+            </div>
+          )}
+          {medicineValid && formData.medicineName && !checkingMedicine && (
+            <div className="mt-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition-all">
+              <span className="text-base">✓</span> 
+              <span>Medicine verified successfully</span>
+            </div>
+          )}
+        </div>
 
-      <select
-        name="frequency"
-        value={formData.frequency}
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
-      >
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="as needed">As Needed</option>
-      </select>
-
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <label className="block text-gray-700 font-medium">Start Date</label>
+        <div>
+          <label className="mb-2 block text-sm font-bold text-gray-800">
+            Dosage <span className="text-red-500">*</span>
+          </label>
           <input
-            type="date"
-            name="startDate"
-            value={formData.startDate}
+            type="text"
+            name="dosage"
+            placeholder="e.g., 500mg, 2 tablets, 5ml"
+            value={formData.dosage}
             onChange={handleChange}
-            className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+            className="w-full rounded-xl border-2 border-blue-200 bg-white px-4 py-3.5 font-medium shadow-sm transition duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
             required
           />
         </div>
 
-        <div className="flex-1">
-          <label className="block text-gray-700 font-medium">End Date</label>
-          <input
-            type="date"
-            name="endDate"
-            value={formData.endDate}
-            onChange={handleChange}
-            className="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
-          />
+        <div>
+          <label className="mb-2 block text-sm font-bold text-gray-800">
+            Frequency <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              name="frequency"
+              value={formData.frequency}
+              onChange={handleChange}
+              className="w-full appearance-none rounded-xl border-2 border-blue-200 bg-white px-4 py-3.5 font-medium shadow-sm transition duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="daily">📅 Daily - Every day</option>
+              <option value="weekly">📆 Weekly - Once per week</option>
+              <option value="as needed">🔔 As Needed - When required</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-blue-600">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <button
-        type="submit"
-        disabled={loading || !medicineValid}
-        className={`w-full bg-blue-500 text-white rounded-lg py-2 hover:bg-blue-600 transition ${
-          loading ? "opacity-60 cursor-not-allowed" : ""
-        }`}
-      >
-        {loading
-          ? "Saving..."
-          : isEditing
-          ? "Update Medicine"
-          : "Save Medicine & Reminders"}
-      </button>
+        <div className="space-y-3">
+          <label className="block text-sm font-bold text-gray-800">
+            ⏰ Reminder Time(s) <span className="text-red-500">*</span>
+          </label>
+          <div className="space-y-2">
+            {formData.time.map((t, index) => (
+              <div
+                key={index}
+                className="group flex items-center gap-3 transition-all duration-200"
+              >
+                <div className="relative flex-1">
+                  <input
+                    type="time"
+                    value={t}
+                    onChange={(e) => handleTimeChange(index, e.target.value)}
+                    className="w-full rounded-xl border-2 border-blue-200 bg-white px-4 py-3.5 font-medium shadow-sm transition duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                    required
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-blue-600">
+                    <span className="text-lg">⏱️</span>
+                  </div>
+                </div>
+                {formData.time.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeTimeField(index)}
+                    className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-red-200 bg-red-50 font-bold text-red-600 shadow-sm transition duration-200 hover:bg-red-100 hover:shadow"
+                    aria-label="Remove time"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addTimeField}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/50 px-4 py-3 text-sm font-bold text-blue-600 shadow-sm transition duration-200 hover:border-blue-400 hover:bg-blue-100 hover:shadow"
+          >
+            <span className="text-xl">+</span> Add Another Reminder Time
+          </button>
+        </div>
+
+        <div className="rounded-2xl border-2 border-blue-100 bg-blue-50/30 p-5">
+          <label className="mb-3 block text-sm font-bold text-gray-800">
+            Schedule Duration
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-600">
+                Start Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                value={formData.startDate}
+                onChange={handleChange}
+                className="w-full rounded-xl border-2 border-blue-200 bg-white px-4 py-3.5 font-medium shadow-sm transition duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-600">
+                End Date <span className="text-xs font-normal text-gray-400">(Optional)</span>
+              </label>
+              <input
+                type="date"
+                name="endDate"
+                value={formData.endDate}
+                onChange={handleChange}
+                className="w-full rounded-xl border-2 border-blue-200 bg-white px-4 py-3.5 font-medium shadow-sm transition duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !medicineValid}
+          className={`group relative mt-6 w-full overflow-hidden rounded-xl py-4 font-bold shadow-lg transition-all duration-300 ${
+            loading || !medicineValid
+              ? "cursor-not-allowed bg-gray-300 text-gray-500"
+              : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-blue-200 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-300"
+          }`}
+        >
+          <span className="relative z-10 flex items-center justify-center gap-2 text-base">
+            {loading ? (
+              <>
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                <span>Processing...</span>
+              </>
+            ) : isEditing ? (
+              <>
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Update Medicine</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Save Medicine & Set Reminders</span>
+              </>
+            )}
+          </span>
+          {!loading && !(!medicineValid) && (
+            <span className="absolute inset-0 -z-0 bg-gradient-to-r from-indigo-600 to-blue-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+          )}
+        </button>
+      </div>
     </form>
   );
 };
