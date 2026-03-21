@@ -10,7 +10,12 @@ const HistoryTable = () => {
     const loadHistory = async () => {
       try {
         const res = await fetchHistory();
-        setHistory(res.data.data || []);
+        const historyData = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data?.data?.history)
+          ? res.data.data.history
+          : [];
+        setHistory(historyData);
       } catch (err) {
         console.error(err);
         setError("Failed to load history. Please try again.");

@@ -50,7 +50,12 @@ const Patient = () => {
   const fetchHistoryData = async () => {
     try {
       const res = await fetchHistory();
-      const sorted = (res.data.data || []).sort(
+      const historyData = Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data?.data?.history)
+        ? res.data.data.history
+        : [];
+      const sorted = historyData.sort(
         (a, b) => new Date(a.time) - new Date(b.time)
       );
       setHistory([...sorted]);
