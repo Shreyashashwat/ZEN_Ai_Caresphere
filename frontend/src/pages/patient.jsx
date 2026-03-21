@@ -89,16 +89,54 @@ const Patient = () => {
     generateStatsReport(statsData, username);
   };
 
-  const fetchHistoryData = async () => {
-    try {
-      const res = await fetchHistory();
-      const sorted = (res.data.data || []).sort((a, b) => new Date(a.time) - new Date(b.time));
-      setHistory(sorted);
-    } catch (err) {
-      console.error("Failed to fetch history:", err);
-    }
-  };
+  // const fetchHistoryData = async () => {
+  //   try {
+  //     const res = await fetchHistory();
+  //     const sorted = (res.data.data || []).sort((a, b) => new Date(a.time) - new Date(b.time));
+  //     setHistory(sorted);
+  //   } catch (err) {
+  //     console.error("Failed to fetch history:", err);
+  //   }
+  // };
+// const fetchHistoryData = async () => {
+//   try {
+//     const res = await fetchHistory();
 
+//     console.log("🔍 [fetchHistoryData] res.data:", res.data);
+//     console.log("🔍 [fetchHistoryData] res.data.data:", res.data.data);
+//     console.log("🔍 [fetchHistoryData] res.data.data.data:", res.data.data?.data);
+
+//     // Backend returns: { data: { data: [...], stats: {} } }
+//     const historyArray = res.data.data?.data || [];
+
+//     console.log("✅ [fetchHistoryData] historyArray length:", historyArray.length);
+//     console.log("✅ [fetchHistoryData] Is array?", Array.isArray(historyArray));
+
+//     const sorted = historyArray.sort((a, b) => new Date(b.time) - new Date(a.time));
+//     setHistory(sorted);
+//   } catch (err) {
+//     console.error("Failed to fetch history:", err);
+//   }
+// };
+const fetchHistoryData = async () => {
+  try {
+    const res = await fetchHistory();
+    const historyArray = res.data.data?.data || [];
+
+    console.log("🔍 [Patient] Total records fetched:", historyArray.length);
+    console.log("🔍 [Patient] Sample record:", historyArray[0]);
+    console.log("🔍 [Patient] All statuses:", [...new Set(historyArray.map(h => h.status))]); // unique statuses
+    console.log("🔍 [Patient] Records with no status:", historyArray.filter(h => !h.status).length);
+
+    const sorted = historyArray
+      .map(h => ({ ...h, status: h.status?.toLowerCase() }))
+      .sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    setHistory(sorted);
+  } catch (err) {
+    console.error("Failed to fetch history:", err);
+  }
+};
   const fetchReminders = async () => {
     try {
       const res = await getReminders();
@@ -521,20 +559,19 @@ const Patient = () => {
                 <h3 className="font-bold text-sm uppercase tracking-wide">Best Day</h3>
               </div>
               <p className="text-2xl font-black">
-                {history.length > 0 ? 
-                  new Date(
-                    Object.entries(
-                      history.reduce((acc, h) => {
-                        if (h.status === 'taken') {
-                          const day = new Date(h.time).toLocaleDateString('en-US', { weekday: 'long' });
-                          acc[day] = (acc[day] || 0) + 1;
-                        }
-                        return acc;
-                      }, {})
-                    ).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
-                  ) : 'N/A'
-                }
-              </p>
+  {history.length > 0
+    ? Object.entries(            
+        history.reduce((acc, h) => {
+          if (h.status === 'taken') {
+            const day = new Date(h.time).toLocaleDateString('en-US', { weekday: 'long' });
+            acc[day] = (acc[day] || 0) + 1;
+          }
+          return acc;
+        }, {})
+      ).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'N/A'
+    : 'N/A'
+  }
+</p>
               <p className="text-xs text-emerald-100 mt-1">Most consistent day</p>
             </div>
 

@@ -9,56 +9,98 @@ const HistoryTable = ({ history: externalHistory }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
+    console.log("🚀 [HistoryTable] useEffect triggered");
+    console.log("📥 [HistoryTable] externalHistory prop:", externalHistory);
+    console.log("📥 [HistoryTable] Is externalHistory an array?", Array.isArray(externalHistory));
+
     // If history is passed as prop from parent, use it
     if (externalHistory && Array.isArray(externalHistory)) {
+      console.log("✅ [HistoryTable] Using externalHistory prop, length:", externalHistory.length);
+      console.log("📋 [HistoryTable] externalHistory sample (first item):", externalHistory[0]);
       setHistory(externalHistory);
       setLoading(false);
       return;
     }
 
+    console.log("🌐 [HistoryTable] No valid externalHistory — falling back to fetchHistory()");
+
     // Otherwise fetch it
     const loadHistory = async () => {
       try {
-        console.log('🔍 Fetching history from HistoryTable...');
+        console.log("📡 [HistoryTable] Calling fetchHistory()...");
         const res = await fetchHistory();
-        console.log('📦 Response:', res);
-        console.log('📊 Response data:', res.data);
-        
+        console.log("📦 [HistoryTable] Raw response object:", res);
+        console.log("📦 [HistoryTable] res.status:", res?.status);
+        console.log("📦 [HistoryTable] res.data:", res?.data);
+        console.log("📦 [HistoryTable] typeof res.data:", typeof res?.data);
+
         // Handle multiple possible response structures
         let historyData = [];
-        
-        if (res.data.data && Array.isArray(res.data.data)) {
-          historyData = res.data.data;
+
+        console.log("🔍 [HistoryTable] Checking response structure...");
+        console.log("  ➡ res.data.data?.data:", res?.data?.data?.data);
+        console.log("  ➡ res.data.history:", res?.data?.history);
+        console.log("  ➡ Array.isArray(res.data):", Array.isArray(res?.data));
+
+        if (res.data.data?.data && Array.isArray(res.data.data.data)) {
+          console.log("✅ [HistoryTable] Matched: res.data.data.data — length:", res.data.data.data.length);
+          historyData = res.data.data.data;
         } else if (res.data.history && Array.isArray(res.data.history)) {
+          console.log("✅ [HistoryTable] Matched: res.data.history — length:", res.data.history.length);
           historyData = res.data.history;
         } else if (Array.isArray(res.data)) {
+          console.log("✅ [HistoryTable] Matched: res.data is array — length:", res.data.length);
           historyData = res.data;
         } else {
-          console.error('❌ Unexpected response structure:', res.data);
+          console.error("❌ [HistoryTable] No matching response structure found!");
+          console.error("❌ [HistoryTable] Full res.data dump:", JSON.stringify(res.data, null, 2));
         }
-        
-        console.log('✅ History data:', historyData);
+
+        console.log("📊 [HistoryTable] Final historyData length:", historyData.length);
+        console.log("📋 [HistoryTable] historyData sample (first item):", historyData[0]);
+        console.log("📋 [HistoryTable] historyData sample (second item):", historyData[1]);
+
+        // Validate each item has expected fields
+        historyData.forEach((item, i) => {
+          const missingFields = [];
+          if (!item._id && !item.historyId) missingFields.push("_id/historyId");
+          if (!item.time) missingFields.push("time");
+          if (!item.status) missingFields.push("status");
+          if (!item.medicineId && !item.medicineName) missingFields.push("medicineId/medicineName");
+          if (missingFields.length > 0) {
+            console.warn(`⚠️ [HistoryTable] Item[${i}] missing fields: ${missingFields.join(", ")}`, item);
+          }
+        });
+
         setHistory(historyData);
       } catch (err) {
-        console.error('❌ Error fetching history:', err);
-        console.error('❌ Error response:', err.response?.data);
+        console.error("❌ [HistoryTable] fetchHistory() threw an error:", err);
+        console.error("❌ [HistoryTable] err.message:", err?.message);
+        console.error("❌ [HistoryTable] err.response?.status:", err?.response?.status);
+        console.error("❌ [HistoryTable] err.response?.data:", err?.response?.data);
+        console.error("❌ [HistoryTable] err.stack:", err?.stack);
         setError("Failed to load history. Please try again.");
       } finally {
+        console.log("🏁 [HistoryTable] loadHistory() finished. loading → false");
         setLoading(false);
       }
     };
-    
+
     loadHistory();
   }, [externalHistory]);
 
   // Filter history based on status and search term
+  console.log("🔄 [HistoryTable] Rendering. history.length:", history.length, "| filterStatus:", filterStatus, "| searchTerm:", searchTerm);
+
   const filteredHistory = history.filter(h => {
     const matchesStatus = filterStatus === "all" || h.status?.toLowerCase() === filterStatus;
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       (h.medicineName && h.medicineName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (h.medicineId?.medicineName && h.medicineId.medicineName.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesStatus && matchesSearch;
   });
+
+  console.log("📊 [HistoryTable] filteredHistory.length:", filteredHistory.length);
 
   return (
     <div className="w-full">
@@ -96,7 +138,7 @@ const HistoryTable = ({ history: externalHistory }) => {
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100">
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setFilterStatus("all")}
+                onClick={() => { console.log("🖱️ [HistoryTable] Filter clicked: all"); setFilterStatus("all"); }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                   filterStatus === "all"
                     ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md"
@@ -106,7 +148,7 @@ const HistoryTable = ({ history: externalHistory }) => {
                 All ({history.length})
               </button>
               <button
-                onClick={() => setFilterStatus("taken")}
+                onClick={() => { console.log("🖱️ [HistoryTable] Filter clicked: taken"); setFilterStatus("taken"); }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                   filterStatus === "taken"
                     ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md"
@@ -116,7 +158,7 @@ const HistoryTable = ({ history: externalHistory }) => {
                 ✅ Taken ({history.filter(h => h.status?.toLowerCase() === "taken").length})
               </button>
               <button
-                onClick={() => setFilterStatus("missed")}
+                onClick={() => { console.log("🖱️ [HistoryTable] Filter clicked: missed"); setFilterStatus("missed"); }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                   filterStatus === "missed"
                     ? "bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-md"
@@ -126,13 +168,16 @@ const HistoryTable = ({ history: externalHistory }) => {
                 ⚠️ Missed ({history.filter(h => h.status?.toLowerCase() === "missed").length})
               </button>
             </div>
-            
+
             <div className="relative flex-1 sm:max-w-xs">
               <input
                 type="text"
                 placeholder="Search medicine..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  console.log("🔎 [HistoryTable] Search input changed:", e.target.value);
+                  setSearchTerm(e.target.value);
+                }}
                 className="w-full rounded-xl border-2 border-blue-200 bg-white px-4 py-2 pl-10 text-sm font-medium text-gray-800 placeholder-gray-400 transition-all duration-200 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -147,18 +192,10 @@ const HistoryTable = ({ history: externalHistory }) => {
               <table className="w-full">
                 <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
                   <tr>
-                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider">
-                      Date & Time
-                    </th>
-                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider">
-                      Medicine
-                    </th>
-                    <th className="hidden sm:table-cell px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider">
-                      Dosage
-                    </th>
-                    <th className="px-4 py-4 text-center text-xs font-extrabold uppercase tracking-wider">
-                      Status
-                    </th>
+                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider">Date & Time</th>
+                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider">Medicine</th>
+                    <th className="hidden sm:table-cell px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider">Dosage</th>
+                    <th className="px-4 py-4 text-center text-xs font-extrabold uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-blue-100">
@@ -173,60 +210,69 @@ const HistoryTable = ({ history: externalHistory }) => {
                       </td>
                     </tr>
                   ) : (
-                    filteredHistory.map((h, index) => (
-                      <tr
-                        key={h._id || h.historyId || `${h.time}-${index}`}
-                        className="group transition-all duration-200 hover:bg-blue-50"
-                      >
-                        <td className="px-4 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-gray-800">
-                              {new Date(h.time).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </span>
-                            <span className="text-xs font-semibold text-gray-500">
-                              {new Date(h.time).toLocaleTimeString([], { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">💊</span>
+                    filteredHistory.map((h, index) => {
+                      console.log(`🧾 [HistoryTable] Rendering row[${index}]:`, {
+                        id: h._id || h.historyId,
+                        time: h.time,
+                        status: h.status,
+                        medicineName: h.medicineId?.medicineName || h.medicineName,
+                        dosage: h.medicineId?.dosage || h.dosage,
+                      });
+                      return (
+                        <tr
+                          key={h._id || h.historyId || `${h.time}-${index}`}
+                          className="group transition-all duration-200 hover:bg-blue-50"
+                        >
+                          <td className="px-4 py-4">
                             <div className="flex flex-col">
                               <span className="text-sm font-bold text-gray-800">
-                                {h.medicineId?.medicineName || h.medicineName || 'Unknown'}
+                                {new Date(h.time).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
                               </span>
-                              <span className="text-xs font-medium text-gray-500 sm:hidden">
-                                {h.medicineId?.dosage || h.dosage || 'N/A'}
+                              <span className="text-xs font-semibold text-gray-500">
+                                {new Date(h.time).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
                               </span>
                             </div>
-                          </div>
-                        </td>
-                        <td className="hidden sm:table-cell px-4 py-4 text-sm font-semibold text-gray-700">
-                          {h.medicineId?.dosage || h.dosage || 'N/A'}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide ${
-                              h.status?.toLowerCase() === "taken"
-                                ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                                : h.status?.toLowerCase() === "missed"
-                                ? "bg-red-100 text-red-700 border border-red-200"
-                                : "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                            }`}
-                          >
-                            {h.status?.toLowerCase() === "taken" ? "✅" : h.status?.toLowerCase() === "missed" ? "⚠️" : "⏳"}
-                            <span className="hidden sm:inline">{h.status || 'Unknown'}</span>
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">💊</span>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-gray-800">
+                                  {h.medicineId?.medicineName || h.medicineName || 'Unknown'}
+                                </span>
+                                <span className="text-xs font-medium text-gray-500 sm:hidden">
+                                  {h.medicineId?.dosage || h.dosage || 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden sm:table-cell px-4 py-4 text-sm font-semibold text-gray-700">
+                            {h.medicineId?.dosage || h.dosage || 'N/A'}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide ${
+                                h.status?.toLowerCase() === "taken"
+                                  ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                  : h.status?.toLowerCase() === "missed"
+                                  ? "bg-red-100 text-red-700 border border-red-200"
+                                  : "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                              }`}
+                            >
+                              {h.status?.toLowerCase() === "taken" ? "✅" : h.status?.toLowerCase() === "missed" ? "⚠️" : "⏳"}
+                              <span className="hidden sm:inline">{h.status || 'Unknown'}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -242,6 +288,7 @@ const HistoryTable = ({ history: externalHistory }) => {
               {filterStatus !== "all" || searchTerm ? (
                 <button
                   onClick={() => {
+                    console.log("🧹 [HistoryTable] Clearing filters");
                     setFilterStatus("all");
                     setSearchTerm("");
                   }}
