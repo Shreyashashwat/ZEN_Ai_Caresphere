@@ -11,6 +11,7 @@ const CalenderView = () => {
       try {
         const user = JSON.parse(localStorage.getItem("user"));
         const token = user?.token;
+
         if (!token) {
           console.error("No token found in localStorage");
           return;
@@ -45,55 +46,57 @@ const CalenderView = () => {
       const dateStr = date.toISOString().split("T")[0];
       const hasEvent = events.some(
         (e) =>
-          e.start.dateTime?.startsWith(dateStr) ||
-          e.start.date?.startsWith(dateStr)
+          e.start?.dateTime?.startsWith(dateStr) ||
+          e.start?.date?.startsWith(dateStr)
       );
-      if (hasEvent)
+
+      if (hasEvent) {
         return (
           <div className="bg-indigo-500 rounded-full w-2 h-2 mx-auto mt-1"></div>
         );
+      }
     }
     return null;
   };
 
   const dayEvents = events.filter((e) => {
-    const eventDate = e.start.dateTime?.split("T")[0] || e.start.date;
+    const eventDate =
+      e.start?.dateTime?.split("T")[0] || e.start?.date;
     return eventDate === selectedDate.toISOString().split("T")[0];
   });
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 transition-all hover:shadow-2xl flex flex-col">
-      {/* Header */}
+    <div className="bg-gradient-to-br from-blue-50 via-indigo-100 to-purple-50 p-8 rounded-3xl shadow-xl border border-gray-200 flex flex-col">
       <h2 className="text-2xl font-bold mb-6 text-indigo-700 flex items-center gap-2">
         📅 Google Calendar Events
       </h2>
 
-      {/* Calendar and Events Side-by-Side */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Calendar */}
-        <div className="flex-1 bg-white rounded-2xl shadow-inner border border-gray-100 p-4 flex justify-center items-center">
+        <div className="flex-1 bg-white rounded-2xl shadow-inner border p-4 flex justify-center">
           <Calendar
             onChange={setSelectedDate}
             value={selectedDate}
             tileContent={tileContent}
-            className="react-calendar w-full h-full border-none"
+            className="react-calendar w-full border-none"
           />
         </div>
 
-        {/* Event List */}
-        <div className="flex-1 bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-inner border border-gray-100 flex flex-col">
-          <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
+        <div className="flex-1 bg-white p-6 rounded-2xl shadow-inner border">
+          <h3 className="text-lg font-semibold text-indigo-700 mb-4">
             🗓️ Events on {selectedDate.toDateString()}
           </h3>
 
           {dayEvents.length > 0 ? (
-            <ul className="space-y-3 overflow-y-auto max-h-[380px] pr-2 scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent">
+            <ul className="space-y-3 max-h-[380px] overflow-y-auto">
               {dayEvents.map((e) => (
                 <li
                   key={e.id}
-                  className="p-4 border border-gray-200 rounded-xl bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 transition-all shadow-sm"
+                  className="p-4 border rounded-xl bg-indigo-50 hover:bg-indigo-100 transition"
                 >
-                  <p className="font-medium text-indigo-700">{e.summary}</p>
+                  <p className="font-medium text-indigo-700">
+                    {e.summary || "No Title"}
+                  </p>
                   <p className="text-sm text-gray-600 mt-1">
                     🕒{" "}
                     {new Date(
@@ -107,7 +110,9 @@ const CalenderView = () => {
               ))}
             </ul>
           ) : (
-            <p className="text-gray-500 italic">No events for this date.</p>
+            <p className="text-gray-500 italic">
+              No events for this date.
+            </p>
           )}
         </div>
       </div>

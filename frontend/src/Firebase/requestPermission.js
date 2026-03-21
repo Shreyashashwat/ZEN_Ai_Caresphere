@@ -1,6 +1,6 @@
-// frontend/firebase/requestPermission.js
+
 import { getToken } from "firebase/messaging";
-import { messaging } from "./firebase"; // your firebase config file
+import { messaging } from "./firebase";
 import axios from "axios";
 
 export const requestPermission = async (userId) => {

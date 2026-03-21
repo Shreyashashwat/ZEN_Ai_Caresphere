@@ -29,7 +29,7 @@ messaging.onBackgroundMessage(function(payload) {
     icon: '/logo192.png',
     data, // keep all fields for click actions
     actions: [
-      { action: 'snooze', title: 'Snooze 10 min' }
+      
     ]
   };
 

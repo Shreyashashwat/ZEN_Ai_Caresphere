@@ -1,4 +1,3 @@
-// controllers/googleCalendar.controller.js
 import { google } from "googleapis";
 
 
@@ -7,22 +6,22 @@ import { Reminder } from "../model/reminderstatus.js";
 
 export const getWebsiteGoogleEvents = async (req, res) => {
   try {
-    const userId = req.user;
+    const userId = req.user?._id || req.user?.id || req.user;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-    // 1️⃣ Find user's calendar tokens
     const calendarData = await Calendar.findOne({ userId });
     if (!calendarData) {
       return res.status(400).json({ message: "No Google Calendar linked" });
     }
 
-    // 2️⃣ Get reminders that have eventIds
     const reminders = await Reminder.find({ userId, eventId: { $exists: true } });
 
     if (reminders.length === 0) {
       return res.json({ events: [] });
     }
 
-    // 3️⃣ Setup auth
     const auth = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -37,7 +36,6 @@ export const getWebsiteGoogleEvents = async (req, res) => {
 
     const calendar = google.calendar({ version: "v3", auth });
 
-    // 4️⃣ Fetch all your website-created events by eventId
     const events = [];
     for (const r of reminders) {
       try {
@@ -59,7 +57,7 @@ export const getWebsiteGoogleEvents = async (req, res) => {
 
     res.json({ events });
   } catch (error) {
-    console.error("❌ Failed to fetch website events:", error.message);
+    console.error("Failed to fetch website events:", error.message);
     res.status(500).json({ message: "Failed to fetch website events" });
   }
 };
