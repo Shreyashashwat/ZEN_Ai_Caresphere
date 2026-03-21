@@ -65,7 +65,7 @@ const PatientDetailModal = ({ patient, onClose }) => {
                         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Relationship</p>
                             <p className="text-lg font-bold text-slate-800 mt-1 flex items-center">
-                                {patient.relationship || "Caregiver"}
+                                {patient.relationship || "Family Member"}
                             </p>
                         </div>
                     </div>

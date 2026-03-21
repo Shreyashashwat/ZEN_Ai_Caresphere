@@ -4,20 +4,21 @@ import app from "./app.js";
 import { sendnoti } from "./firebase/SendNotification.js";
 import cron from "node-cron";
 import { User } from "./model/user.model.js";
-import { generateWeeklyInsightsForAllUsers } from "./controllers/user.controller.js";
 import { trainAdherenceModel } from "./ml/train.js";
+import { generateWeeklyInsightsForAllUsers } from "./controllers/user.controller.js";
 dotenv.config({ path: "./.env" });
 
 
 cron.schedule("0 0 * * 0", async () => {
-console.log("📊 Weekly retraining job started...");
+    console.log("📊 Weekly retraining job started...");
     try {
         await trainAdherenceModel();
         console.log("✅ Model retraining complete!");
     } catch (err) {
         console.error("❌ Error during retraining:", err);
     }
-});;
+});
+
 cron.schedule("0 0 * * 0", async () => {
   console.log("🧠 Weekly health insights generation started...");
   try {
@@ -27,22 +28,25 @@ cron.schedule("0 0 * * 0", async () => {
     console.error("❌ Health insights cron failed:", err);
   }
 });
+
 connectDB()
     .then(async () => {
-        console.log("🟢 MongoDB connected, starting one-time ML training...");
+        console.log("🟢 MongoDB connected");
 
-        // 🔥 TEMPORARY: run training once
-        await trainAdherenceModel()
-        await generateWeeklyInsightsForAllUsers()
         const PORT = process.env.PORT || 8000;
         app.listen(PORT, () => {
             console.log(`✅ Server is running at ${PORT}`);
-        //   await trainAdherenceModel();
             sendnoti();
 
- 
-      
-        });
+            // Run ML training and insights generation in the background (non-blocking)
+            console.log("🔄 Starting background ML training and insights generation...");
+            Promise.all([
+                trainAdherenceModel().catch(err => console.error("❌ ML training failed:", err)),
+                generateWeeklyInsightsForAllUsers().catch(err => console.error("❌ Insights generation failed:", err)),
+            ]).then(() => {
+                console.log("✅ Background tasks completed");
+            });
+    });
     })
     .catch((err) => {
         console.log(`❌ DB connection error: ${err}`);

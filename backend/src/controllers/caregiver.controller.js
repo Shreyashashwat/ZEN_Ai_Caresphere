@@ -1,58 +1,102 @@
 import mongoose from "mongoose";
 import { User } from "../model/user.model.js";
 import { CaregiverLink } from "../model/caregiverLink.model.js";
+import { sendFamilyInviteEmail } from "../utils/emailService.js";
 
+const getCurrentUserId = (req) => req.user?._id || req.user?.id || req.user;
 
 export const inviteCaregiver = async (req, res) => {
     try {
-        const { email } = req.body;
-        const patientId = req.user.id;
+        const { email, relationship, message } = req.body;
+        const patientId = getCurrentUserId(req);
+
+        if (!patientId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
         if (!email) {
             return res.status(400).json({
                 success: false,
-                message: "Caregiver email is required",
+                message: "Family member email is required",
             });
         }
 
-        const caregiver = await User.findOne({ email: email.toLowerCase() });
-        if (!caregiver) {
+        const inviter = await User.findById(patientId);
+        if (!inviter) {
             return res.status(404).json({
                 success: false,
-                message: "Caregiver user not found",
+                message: "Inviter not found",
             });
         }
 
-        if (caregiver._id.toString() === patientId) {
+        if (inviter.email.toLowerCase() === email.toLowerCase()) {
             return res.status(400).json({
                 success: false,
                 message: "You cannot invite yourself",
             });
         }
 
-        const existing = await CaregiverLink.findOne({
+        const caregiver = await User.findOne({ email: email.toLowerCase() });
+
+        const existingByEmail = await CaregiverLink.findOne({
             patientId,
-            caregiverId: caregiver._id,
+            caregiverEmail: email.toLowerCase(),
         });
 
-        if (existing) {
+        if (existingByEmail) {
             return res.status(400).json({
                 success: false,
-                message: `Invite already exists (status: ${existing.status})`,
+                message: `Invite already sent to ${email} (status: ${existingByEmail.status})`,
+            });
+        }
+
+        if (caregiver) {
+            await CaregiverLink.create({
+                patientId,
+                caregiverId: caregiver._id,
+                caregiverEmail: email.toLowerCase(),
+                relationship: relationship || "Family Member",
+                message: message || "",
+                status: "Pending",
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: "Family invitation sent successfully!",
             });
         }
 
         await CaregiverLink.create({
             patientId,
-            caregiverId: caregiver._id,
-            caregiverEmail: caregiver.email,
+            caregiverId: null,
+            caregiverEmail: email.toLowerCase(),
+            relationship: relationship || "Family Member",
+            message: message || "",
             status: "Pending",
         });
 
-        return res.status(201).json({
-            success: true,
-            message: "Caregiver invitation sent",
-        });
+        try {
+            await sendFamilyInviteEmail({
+                toEmail: email.toLowerCase(),
+                inviterName: inviter.username,
+                inviterEmail: inviter.email,
+                relationship: relationship || "Family Member",
+                message,
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: `Invitation email sent to ${email}! They'll need to create an account to accept.`,
+                emailSent: true,
+            });
+        } catch (emailError) {
+            console.error("Email send failed:", emailError);
+            return res.status(201).json({
+                success: true,
+                message: "Invitation created, but email notification failed. Please ask them to register manually.",
+                emailSent: false,
+            });
+        }
     } catch (error) {
         console.error("inviteCaregiver error:", error);
         return res.status(500).json({
@@ -65,21 +109,47 @@ export const inviteCaregiver = async (req, res) => {
 
 export const getMyCaregivers = async (req, res) => {
     try {
-        const caregivers = await CaregiverLink.find({
-            patientId: req.user.id,
+        const userId = getCurrentUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const myInvites = await CaregiverLink.find({
+            patientId: userId,
         }).populate("caregiverId", "username email");
 
-        const formatted = caregivers.map(link => ({
+        const invitedToMe = await CaregiverLink.find({
+            caregiverId: userId,
+            status: "Active",
+        }).populate("patientId", "username email");
+
+        const formattedMyInvites = myInvites.map(link => ({
             id: link._id,
-            caregiverId: link.caregiverId?._id || null,
-            name: link.caregiverId?.username || "Unknown",
-            email: link.caregiverId?.email || "",
-            status: link.status,
+            memberId: link.caregiverId?._id || null,
+            name: link.caregiverId?.username || (link.caregiverEmail ? "Awaiting Registration" : "Unknown"),
+            email: link.caregiverId?.email || link.caregiverEmail || "",
+            relationship: link.relationship || "Family Member",
+            status: link.caregiverId ? link.status : "Invited",
+            isEmailOnly: !link.caregiverId,
+            direction: "invited",
         }));
+
+        const formattedInvitedToMe = invitedToMe.map(link => ({
+            id: link._id,
+            memberId: link.patientId?._id || null,
+            name: link.patientId?.username || "Unknown",
+            email: link.patientId?.email || "",
+            relationship: link.relationship || "Family Member",
+            status: link.status,
+            isEmailOnly: false,
+            direction: "accepted",
+        }));
+
+        const allFamilyMembers = [...formattedMyInvites, ...formattedInvitedToMe];
 
         return res.status(200).json({
             success: true,
-            caregivers: formatted,
+            data: allFamilyMembers,
         });
     } catch (error) {
         console.error("getMyCaregivers error:", error);
@@ -96,16 +166,38 @@ export const getMyCaregivers = async (req, res) => {
 
 export const getPendingInvites = async (req, res) => {
     try {
+        const userId = getCurrentUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const currentUser = await User.findById(userId);
+        if (!currentUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
         const invites = await CaregiverLink.find({
-            caregiverId: req.user.id,
-            status: { $in: ["Pending", "pending"] },
+            $or: [
+                { caregiverId: userId },
+                { caregiverEmail: currentUser.email.toLowerCase(), caregiverId: null },
+            ],
+            status: "Pending",
         }).populate("patientId", "username email age gender");
+
+        for (const invite of invites) {
+            if (!invite.caregiverId && invite.caregiverEmail === currentUser.email.toLowerCase()) {
+                invite.caregiverId = currentUser._id;
+                await invite.save();
+            }
+        }
 
         const formatted = invites.map(invite => ({
             id: invite._id,
             patientId: invite.patientId?._id,
             patientName: invite.patientId?.username,
             patientEmail: invite.patientId?.email,
+            relationship: invite.relationship,
+            message: invite.message,
             createdAt: invite.createdAt,
         }));
 
@@ -126,7 +218,12 @@ export const getPendingInvites = async (req, res) => {
 
 export const respondToInvite = async (req, res) => {
     try {
-        const { id } = req.params; 
+        const userId = getCurrentUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { id } = req.params;
         const { action } = req.body;
 
         if (!["accept", "reject"].includes(action)) {
@@ -138,8 +235,8 @@ export const respondToInvite = async (req, res) => {
 
         const invite = await CaregiverLink.findOne({
             _id: id,
-            caregiverId: req.user.id,
-            status: { $in: ["Pending", "pending"] },
+            caregiverId: userId,
+            status: "Pending",
         });
 
         if (!invite) {
@@ -169,9 +266,14 @@ export const respondToInvite = async (req, res) => {
 
 export const getAssignedPatients = async (req, res) => {
     try {
+        const userId = getCurrentUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const links = await CaregiverLink.find({
-            caregiverId: req.user.id,
-            status: "Active", 
+            caregiverId: userId,
+            status: "Active",
         }).populate("patientId", "username email age gender");
 
         const patients = links.map(link => ({
@@ -199,8 +301,12 @@ export const getAssignedPatients = async (req, res) => {
 
 export const getPatientDetails = async (req, res) => {
     try {
+        const caregiverId = getCurrentUserId(req);
+        if (!caregiverId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const { patientId } = req.params;
-        const caregiverId = req.user.id;
 
         const link = await CaregiverLink.findOne({
             patientId,
@@ -248,15 +354,19 @@ export const getPatientDetails = async (req, res) => {
 //  * ================================
 export const removeCaregiver = async (req, res) => {
     try {
-        const { id } = req.params; 
-        
+        const userId = getCurrentUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { id } = req.params;
+
         const link = await CaregiverLink.findById(id);
         if (!link) {
             return res.status(404).json({ success: false, message: "Link not found" });
         }
 
-        // Check authorization
-        if (link.patientId.toString() !== req.user.id && link.caregiverId?.toString() !== req.user.id) {
+        if (link.patientId.toString() !== userId.toString() && link.caregiverId?.toString() !== userId.toString()) {
             return res.status(403).json({ success: false, message: "Not authorized" });
         }
 
