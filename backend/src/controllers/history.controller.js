@@ -13,6 +13,7 @@ const getHistory = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User ID is missing");
   }
 
+  const now = new Date();
   const days = parseInt(req.query.days) || 7;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -20,10 +21,10 @@ const getHistory = asyncHandler(async (req, res) => {
 
   console.log(`📅 Fetching history for user ${userId} from ${startDate.toISOString()}`);
 
-  // ✅ Get reminders from the Reminder collection
+  // Only fetch reminders whose time has already passed
   const reminders = await Reminder.find({
     userId: userId,
-    time: { $gte: startDate }
+    time: { $gte: startDate, $lte: now },
   })
   .populate('medicineId', 'medicineName dosage frequency')
   .sort({ time: -1 })
@@ -47,14 +48,19 @@ const getHistory = asyncHandler(async (req, res) => {
       : null
   }));
 
-  // Calculate stats
+  // Calculate stats — exclude pending from adherence rate (not yet processed by cron)
+  const takenCount  = history.filter(h => h.status === 'taken').length;
+  const missedCount = history.filter(h => h.status === 'missed').length;
+  const pendingCount = history.filter(h => h.status === 'pending').length;
+  const resolvedCount = takenCount + missedCount;
+
   const stats = {
     total: history.length,
-    taken: history.filter(h => h.status === 'taken').length,
-    missed: history.filter(h => h.status === 'missed').length,
-    pending: history.filter(h => h.status === 'pending').length,
-    adherenceRate: history.length > 0 
-      ? Math.round((history.filter(h => h.status === 'taken').length / history.length) * 100)
+    taken: takenCount,
+    missed: missedCount,
+    pending: pendingCount,
+    adherenceRate: resolvedCount > 0
+      ? Math.round((takenCount / resolvedCount) * 100)
       : 0
   };
 

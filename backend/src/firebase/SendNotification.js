@@ -136,9 +136,10 @@ const sendnoti = () => {
       }
 
       /* ⚠️ HANDLE MISSED REMINDERS */
+      // Use $ne:true so we also catch old documents where processedMissed field is absent
       const lateReminders = await Reminder.find({
         status: "pending",
-        processedMissed: false,
+        processedMissed: { $ne: true },
         time: { $lt: new Date(now.getTime() - 30 * 60 * 1000) },
       });
 

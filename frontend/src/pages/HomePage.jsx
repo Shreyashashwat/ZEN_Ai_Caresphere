@@ -109,6 +109,7 @@ const HomePage = () => {
       // Send undefined for age/gender if Doctor to keep payload clean
       age: userRole === "user" ? registerData.age : undefined,
       gender: userRole === "user" ? registerData.gender : undefined,
+      doctorCode: userRole === "doctor" ? registerData.doctorCode : undefined,
     };
 
     try {
@@ -320,26 +321,22 @@ const HomePage = () => {
                 </div>
               )}
 
+              {userRole === "doctor" && (
               <div>
                 <input
                   type="text"
                   name="doctorCode"
                   value={registerData.doctorCode}
                   onChange={handleRegisterChange}
-                  placeholder={
-                    userRole === "doctor"
-                      ? "Create Unique Doctor Code"
-                      : "Doctor Code to Connect"
-                  }
+                  placeholder="Create Unique Doctor Code"
                   required
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 uppercase transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
-                {userRole === "doctor" && (
-                  <p className="ml-1 mt-1 text-xs text-gray-500">
-                    Patients will use this code to connect with you.
-                  </p>
-                )}
+                <p className="ml-1 mt-1 text-xs text-gray-500">
+                  Patients will use this code to connect with you.
+                </p>
               </div>
+              )}
 
               <button
                 type="submit"

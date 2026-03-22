@@ -358,8 +358,8 @@ const scheduleAppointment = asyncHandler(async (req, res) => {
 
 export const getDoctorAppointments = async (req, res) => {
   try {
-    const appointments = await Appointment.find({ doctorId: req.user._id })
-      .populate("patientId", "username email")
+    const appointments = await Appointment.find({ patientId: req.user._id })
+      .populate("doctorId", "username email")
       .sort({ appointmentDate: 1 });
     res.status(200).json({ success: true, data: appointments });
   } catch (err) {
