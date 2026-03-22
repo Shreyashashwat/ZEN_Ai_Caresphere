@@ -2,12 +2,18 @@ import React, { useEffect, useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
-const CalenderView = () => {
+const CalenderView = ({ reminders }) => {
   const [events, setEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  // Add this helper at the top of the component
+const toLocalDateStr = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
   useEffect(() => {
     const loadEvents = async () => {
       setLoading(true);
@@ -47,11 +53,11 @@ const CalenderView = () => {
     };
 
     loadEvents();
-  }, []);
+  }, [reminders]);
 
   const tileContent = ({ date, view }) => {
     if (view === "month") {
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr =toLocalDateStr(date);;
       const hasEvent = events.some(
         (e) =>
           e.start?.dateTime?.startsWith(dateStr) ||
@@ -70,10 +76,14 @@ const CalenderView = () => {
   };
 
   const dayEvents = events.filter((e) => {
-    const eventDate =
-      e.start?.dateTime?.split("T")[0] || e.start?.date;
-    return eventDate === selectedDate.toISOString().split("T")[0];
-  });
+  let eventDate;
+  if (e.start?.dateTime) {
+    eventDate = toLocalDateStr(new Date(e.start.dateTime)); // ✅ convert to local
+  } else {
+    eventDate = e.start?.date; 
+  }
+  return eventDate === toLocalDateStr(selectedDate);
+});
 
   const formatEventTime = (event) => {
     if (event.start?.dateTime) {
@@ -86,7 +96,7 @@ const CalenderView = () => {
   };
 
   const isEventToday = (event) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = toLocalDateStr(new Date());
     const eventDate = event.start?.dateTime?.split("T")[0] || event.start?.date;
     return eventDate === today;
   };
@@ -116,17 +126,22 @@ const CalenderView = () => {
             <span className="text-xl">⚠️</span>
             <span className="font-semibold">{error}</span>
           </div>
-          {error.includes("No Google Calendar linked") && (
-            <button
-              onClick={() => {
-                window.location.href = "http://localhost:8000/api/v1/auth/google";
-              }}
-              className="mt-3 flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-bold text-white transition-all duration-300 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg active:scale-95"
-            >
-              <span className="text-lg">🔗</span>
-              Connect to Google Calendar
-            </button>
-          )}
+         {(error.includes("No Google Calendar linked") || 
+  error.includes("400") ||          // ← add this
+  error.includes("401") || 
+  error.includes("expired")) && (
+  <button
+    onClick={() => {
+      const user = JSON.parse(localStorage.getItem("user"));
+      window.location.href = 
+        `http://localhost:8000/api/v1/auth/google/connect-calendar?token=${user.token}`;
+    }}
+    className="mt-3 flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-bold text-white transition-all duration-300 hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg active:scale-95"
+  >
+    <span className="text-lg">🔗</span>
+    Connect to Google Calendar
+  </button>
+)}
         </div>
       )}
 

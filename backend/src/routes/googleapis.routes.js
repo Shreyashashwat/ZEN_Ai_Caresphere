@@ -13,50 +13,86 @@ const oauth2Client = new google.auth.OAuth2(
   "http://localhost:8000/api/v1/oauth2callback"
 );
 
-// ✅ STEP 1: Redirect user to Google OAuth with JWT token encoded in state
-// STEP 1: Redirect user to Google
+// STEP 1a: Login flow (no token)
 router.get("/auth/google", (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
-    scope: [
-      "profile",
-      "email",
-      "https://www.googleapis.com/auth/calendar"
-    ],
+    scope: ["profile", "email", "https://www.googleapis.com/auth/calendar"],
     state: "login"
   });
-
   res.redirect(url);
 });
 
+// STEP 1b: Connect calendar flow (logged-in user passes their token)
+router.get("/auth/google/connect-calendar", (req, res) => {
+  const token = req.query.token; // JWT from localStorage
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: ["profile", "email", "https://www.googleapis.com/auth/calendar"],
+    state: `connect_calendar:${token}` // encode who is connecting
+  });
+  res.redirect(url);
+});
 
-
-// ✅ STEP 2: Handle Google callback, link tokens to user, redirect to frontend
-// STEP 2: Handle Google callback
+// STEP 2: Single callback handles both
 router.get("/oauth2callback", async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
 
   try {
-    // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    // Get Google profile
     const oauth2 = google.oauth2("v2");
     const { data } = await oauth2.userinfo.get({ auth: oauth2Client });
 
-    // Find or create user
-    let user = await User.findOne({ email: data.email });
+    // ── CONNECT CALENDAR FLOW ──
+    if (state?.startsWith("connect_calendar:")) {
+      const jwtToken = state.replace("connect_calendar:", "");
+      const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
 
-    if (!user) {
-      user = await User.create({
-        username: data.name,
-        email: data.email,
+      await User.findByIdAndUpdate(decoded.id || decoded._id, {
+        googleTokens: {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expiry_date: tokens.expiry_date,
+        },
+        hasGoogleAccount: true,
+        googleEmail: data.email,  // save which Gmail was linked
       });
+
+      // Also save to Calendar model if you use it
+      await Calendar.findOneAndUpdate(
+        { userId: decoded.id || decoded._id },
+        {
+          userId: decoded.id || decoded._id,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiryDate: new Date(tokens.expiry_date),
+        },
+        { upsert: true }
+      );
+
+      return res.redirect(`http://localhost:5173/patient?calendarConnected=true`);
     }
 
-    // Save calendar tokens
+    // ── LOGIN FLOW ──
+    // Only allow existing users to login (no auto-creation)
+    console.log(`🔍 Checking if user exists with email: ${data.email}`);
+    let user = await User.findOne({ email: data.email });
+    
+    if (!user) {
+      console.log(`❌ No user found with email: ${data.email}`);
+      // User doesn't exist - redirect to login with error
+      return res.redirect(
+        `http://localhost:5173/?error=${encodeURIComponent("Account not found. Please register with your email first.")}`
+      );
+    }
+    
+    console.log(`✅ User found: ${user.username} (${user.email})`);
+
+    // Update existing user with Google tokens
     await User.findByIdAndUpdate(user._id, {
       googleTokens: {
         access_token: tokens.access_token,
@@ -64,26 +100,23 @@ router.get("/oauth2callback", async (req, res) => {
         expiry_date: tokens.expiry_date,
       },
       hasGoogleAccount: true,
+      googleEmail: data.email,
     });
 
-    // Create JWT
     const jwtToken = jwt.sign(
-      { _id: user._id },
+      { _id: user._id , role: user.role || "user"},
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // Redirect to frontend
     res.redirect(
-      `http://localhost:5173/google-success?token=${jwtToken}&userId=${user._id}&username=${encodeURIComponent(user.username)}`
+     `http://localhost:5173/google-success?token=${jwtToken}&userId=${user._id}&username=${encodeURIComponent(user.username)}&role=${user.role || "user"}`
     );
+
   } catch (err) {
-    console.error("Google login error:", err);
-    res.status(401).send("Google login failed");
+    console.error("Google OAuth error:", err);
+    res.status(401).send("Google authentication failed");
   }
 });
-
-
-
 
 export default router;

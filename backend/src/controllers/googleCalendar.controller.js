@@ -11,7 +11,7 @@ export const getWebsiteGoogleEvents = async (req, res) => {
     }
 
     const calendarData = await Calendar.findOne({ userId });
-    if (!calendarData) {
+    if (!calendarData || !calendarData.accessToken) {
       return res.status(400).json({ message: "No Google Calendar linked" });
     }
 
@@ -33,6 +33,20 @@ export const getWebsiteGoogleEvents = async (req, res) => {
       expiry_date: new Date(calendarData.expiryDate).getTime(),
     });
 
+    // 🔁 Update DB when Google issues new tokens
+    auth.on('tokens', async (tokens) => {
+      if (tokens.refresh_token || tokens.access_token) {
+        await Calendar.findOneAndUpdate(
+          { userId },
+          {
+            ...(tokens.refresh_token && { refreshToken: tokens.refresh_token }),
+            ...(tokens.access_token && { accessToken: tokens.access_token }),
+            expiryDate: tokens.expiry_date,
+          }
+        );
+      }
+    });
+
     const calendar = google.calendar({ version: "v3", auth });
 
     const events = [];
@@ -48,6 +62,7 @@ export const getWebsiteGoogleEvents = async (req, res) => {
           start: data.start,
           end: data.end,
           description: data.description,
+          location: data.location,
         });
       } catch (err) {
         console.warn(`⚠️ Skipped missing/invalid event: ${r.eventId}`);
@@ -57,6 +72,12 @@ export const getWebsiteGoogleEvents = async (req, res) => {
     res.json({ events });
   } catch (error) {
     console.error("Failed to fetch website events:", error.message);
+    
+    // If token is invalid/expired and can't be refreshed
+    if (error.message.includes("invalid_grant") || error.message.includes("Invalid Credentials")) {
+      return res.status(401).json({ message: "Google Calendar access expired. Please reconnect." });
+    }
+    
     res.status(500).json({ message: "Failed to fetch website events" });
   }
 };

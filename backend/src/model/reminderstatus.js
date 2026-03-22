@@ -19,7 +19,7 @@ const reminderStatusSchema = new mongoose.Schema({
 }, { timestamps: true });
 =======
    eventId: { type: String },
-
+  autoAdjusted: { type: Boolean, default: false },
 });
 >>>>>>> doctor
 export const Reminder=mongoose.model("Reminder",reminderStatusSchema)

@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 
 import Home from "./pages/HomePage";
@@ -17,32 +17,6 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import MedicineReminderToast from "./components/MedicineReminderToast";
 import GoogleSuccess from "./pages/GoogleSuccess.jsx";
-
-// Set up foreground notification listener at module level (runs once on load)
-// Use window object to persist flag across hot reloads
-if (!window.__FCM_LISTENER_REGISTERED__ && messaging) {
-  onMessage(messaging, (payload) => {
-    console.log("✅ [FOREGROUND] FCM message received:", payload);
-
-    const { title, body, medicineId } = payload.data || {};
-    if (!medicineId) {
-      console.log("⚠️ No medicineId in payload, skipping notification");
-      return;
-    }
-
-    toast.info(
-      <MedicineReminderToast
-        title={title || "💊 Medicine Reminder"}
-        body={body || "Time to take your medicine!"}
-        medicineId={medicineId}
-      />,
-      { autoClose: false, closeOnClick: false }
-    );
-  });
-  
-  window.__FCM_LISTENER_REGISTERED__ = true;
-  console.log("✅ [SETUP] Foreground notification listener registered");
-}
 
 function ChatbotWrapper() {
   const location = useLocation();
@@ -64,6 +38,38 @@ function ChatbotWrapper() {
 }
 
 function App() {
+  useEffect(() => {
+    if (!messaging) return;
+
+    // onMessage returns an unsubscribe function — calling it removes the listener
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("✅ [FOREGROUND] FCM message received:", payload);
+
+      const { title, body, medicineId } = payload.data || {};
+      if (!medicineId) {
+        console.log("⚠️ No medicineId in payload, skipping notification");
+        return;
+      }
+
+      toast.info(
+        <MedicineReminderToast
+          title={title || "💊 Medicine Reminder"}
+          body={body || "Time to take your medicine!"}
+          medicineId={medicineId}
+        />,
+        { autoClose: false, closeOnClick: false }
+      );
+    });
+
+    console.log("✅ [SETUP] Foreground notification listener registered");
+
+    // Cleanup: removes the listener when component unmounts or re-renders (HMR)
+    return () => {
+      unsubscribe();
+      console.log("🧹 [CLEANUP] Foreground notification listener removed");
+    };
+  }, []);
+
   return (
     <UserProvider>
       <Router>
@@ -85,4 +91,3 @@ function App() {
 }
 
 export default App;
-

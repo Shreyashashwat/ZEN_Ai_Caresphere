@@ -41,6 +41,7 @@ const Patient = () => {
   const [showAptModal, setShowAptModal] = useState(false);
   const [aptDoctor, setAptDoctor] = useState(null);
   const [aptForm, setAptForm] = useState({ date: "", time: "", problem: "" });
+  const [loadingApt, setLoadingApt] = useState(false);
 
   // Activity Log States for Large Data
   const [activityLogPage, setActivityLogPage] = useState(1);
@@ -68,6 +69,15 @@ const Patient = () => {
       console.error("Failed to fetch weekly insights", err);
     }
   };
+
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("calendarConnected") === "true") {
+    alert("Google Calendar connected successfully!");
+    
+    window.history.replaceState({}, "", "/patient");
+  }
+}, []);
 
   const fetchMedicines = async () => {
     try {
@@ -305,6 +315,7 @@ const fetchHistoryData = async () => {
 
   const handleAptSubmit = async (e) => {
     e.preventDefault();
+    setLoadingApt(true);
     try {
       const appointmentDate = new Date(`${aptForm.date}T${aptForm.time}`);
       await createAppointment({
@@ -317,6 +328,8 @@ const fetchHistoryData = async () => {
       setAptForm({ date: "", time: "", problem: "" });
     } catch (err) {
       alert(err.response?.data?.message || "Failed to schedule appointment");
+    } finally {
+      setLoadingApt(false);
     }
   };
 

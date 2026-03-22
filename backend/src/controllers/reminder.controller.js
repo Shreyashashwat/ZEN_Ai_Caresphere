@@ -228,65 +228,25 @@ const markasMissed = asyncHandler(async (req, res) => {
 });
 const handleMissedReminder = async (reminderId) => {
   const reminder = await Reminder.findById(reminderId);
-  if (!reminder || reminder.status !== "missed") return;
+  if (!reminder) return;
 
-  const scheduledTime = new Date(reminder.time);
-  const delay =
-    (new Date(reminder.userResponseTime) - scheduledTime) / 60000;
+  // If already auto adjusted once → now mark permanently missed
+  if (reminder.autoAdjusted) {
+    reminder.status = "missed";
+    await reminder.save();
+    return;
+  }
 
-  let risk = 0.5;
-  try {
-    risk = await predictAdherenceRisk(
-      scheduledTime.getHours(),
-      scheduledTime.getDay(),
-      delay
-    );
-  } catch (e) {}
-
-    await createPreReminderIfHighRisk(reminder, risk);
-
-  let newTime =
-    risk > 0.75
-      ? new Date(scheduledTime.getTime() + 30 * 60000)
-      : risk > 0.5
-      ? new Date(scheduledTime.getTime() + 15 * 60000)
-      : suggestNextTime(scheduledTime);
+  // Otherwise allow one smart adjustment
+  const newTime = new Date(reminder.time.getTime() + 5 * 60000);
 
   reminder.time = newTime;
   reminder.status = "pending";
+  reminder.autoAdjusted = true;   // 🔥 important
   reminder.userResponseTime = null;
+
   await reminder.save();
-
-  const safeRisk =
-  typeof risk === "number" && !Number.isNaN(risk)
-    ? Math.min(Math.max(risk, 0), 1)
-    : 0.5; 
-
-  await AIAnalytics.findOneAndUpdate(
-    { userId: reminder.userId, medicineId: reminder.medicineId },
-    {
-      riskLevel: safeRisk,
-      lastAnalysis: new Date(),
-    },
-    { upsert: true }
-  );
-
-  await applyPreReminderToFutureDoses(
-    reminder.userId,
-    reminder.medicineId,
-    risk
-  );
-
-  const calendarData = await Calendar.findOne({ userId: reminder.userId });
-  if (calendarData) {
-    await updateMedicineInGoogleCalendar(
-      reminder,
-      calendarData,
-      newTime,
-      "Rescheduled ⏰ (AI-adjusted)"
-    );
-  }
-}
+};
 const applyPreReminderToFutureDoses = async (userId, medicineId, risk) => {
   if (risk <= 0.75) return;
 
@@ -309,7 +269,7 @@ const learnAndShiftHabit = async (userId, medicineId) => {
     userResponseTime: { $ne: null },
   })
     .sort({ userResponseTime: -1 })
-    .limit(3);
+    .limit(5);
 
   if (recent.length < 3) return;
 

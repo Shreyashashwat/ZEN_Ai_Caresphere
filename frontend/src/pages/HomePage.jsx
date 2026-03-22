@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser, registerUser } from "../api";
 
@@ -18,6 +18,24 @@ const HomePage = () => {
     gender: "",
     doctorCode: "",
   });
+
+  // Handle Google OAuth errors from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    if (error) {
+      const errorMsg = decodeURIComponent(error);
+      console.error("Google OAuth Error:", errorMsg);
+      
+      // Show prominent error alert
+      setTimeout(() => {
+        alert(`❌ Google Sign-In Failed\n\n${errorMsg}`);
+      }, 100);
+      
+      // Clean up URL
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
 
   const clearForms = () => {
     setLoginData({ email: "", password: "" });
