@@ -4,7 +4,7 @@ import admin from "./firebaseAdmin.js";
 import { Reminder } from "../model/reminderstatus.js";
 import { Medicine } from "../model/medicine.model.js";
 import { User } from "../model/user.model.js";
-
+// import { User } from "../model/user.model.js";
 /* ✅ Raw function - no asyncHandler, safe to call from cron */
 const handleMissedReminder = async (reminderId) => {
   const reminder = await Reminder.findById(reminderId);
