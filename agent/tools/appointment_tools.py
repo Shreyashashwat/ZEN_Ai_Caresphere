@@ -42,7 +42,7 @@ def make_appointment_tools(token: str):
         No input needed — pass an empty string.
         """
         try:
-            # Uses patient-facing endpoint
+
             result = api_get("/api/v1/doctor-request/myappointments", token)
             appointments = result.get("data", [])
 
@@ -79,7 +79,7 @@ def make_appointment_tools(token: str):
         No input needed — pass an empty string.
         """
         try:
-            # Uses patient-facing endpoint
+
             result = api_get("/api/v1/doctor-request/myappointments", token)
             appointments = result.get("data", [])
 
@@ -100,7 +100,7 @@ def make_appointment_tools(token: str):
             doctor = apt.get("doctorId", {})
             doc_name = doctor.get("username", "your doctor") if isinstance(doctor, dict) else "your doctor"
 
-            # Format date nicely
+         
             date_str = apt.get("appointmentDate", "")
             try:
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
@@ -136,7 +136,7 @@ def make_appointment_tools(token: str):
         if not doctorId or not appointmentDate or not problem:
             return "Missing required fields: doctorId, appointmentDate, and problem are all required."
 
-        # Guard: reject placeholder/fake IDs - must be a 24-char hex MongoDB ObjectId
+
         import re
         if not re.fullmatch(r'[a-fA-F0-9]{24}', doctorId):
             return (
@@ -168,7 +168,7 @@ def make_appointment_tools(token: str):
                 doctor_field.get("username") if isinstance(doctor_field, dict) else None
             ) or "your doctor"
 
-            # Format date nicely
+         
             date_str = appt.get("appointmentDate", appointmentDate)
             try:
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))

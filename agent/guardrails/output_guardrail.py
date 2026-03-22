@@ -28,13 +28,13 @@ def validate_output(response: str) -> tuple[bool, str]:
     if not response or not response.strip():
         return False, "I wasn't able to generate a response. Please try again."
 
-    # Truncate if too long
+  
     if len(response) > MAX_RESPONSE_LENGTH:
         response = response[:MAX_RESPONSE_LENGTH].rstrip() + (
             "...\n\n*(Response was truncated. Please ask a more specific question.)*"
         )
 
-    # Check for data leaks
+    
     for pattern in LEAK_PATTERNS:
         if re.search(pattern, response):
             return False, (

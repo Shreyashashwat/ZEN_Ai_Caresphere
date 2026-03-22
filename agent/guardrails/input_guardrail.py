@@ -2,7 +2,6 @@ import re
 
 MAX_MESSAGE_LENGTH = 1000
 
-# These patterns get BLOCKED — the agent never sees these messages
 BLOCKED_PATTERNS = [
     # Self-harm / crisis
     (r"\b(suicide|kill myself|end my life|want to die|self.?harm)\b", "crisis"),
