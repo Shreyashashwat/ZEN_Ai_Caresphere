@@ -5,14 +5,11 @@ import { sendnoti } from "./firebase/SendNotification.js";
 import cron from "node-cron";
 import { User } from "./model/user.model.js";
 import { trainAdherenceModel } from "./ml/train.js";
-import { generateWeeklyInsightsForAllUsers } from "./controllers/user.controller.js";
+
 import { Reminder } from "./model/reminderstatus.js";
 dotenv.config({ path: "./.env" });
 
-/**
- * One-time startup cleanup: remove duplicate Reminder documents.
- * Keeps the best record per (medicineId, userId, day) and deletes the rest.
- */
+
 async function cleanupDuplicateReminders() {
   try {
     console.log("🧹 Running duplicate reminder cleanup...");
@@ -37,7 +34,7 @@ async function cleanupDuplicateReminders() {
     for (const group of groups) {
       const docs = group.docs;
 
-      // Prefer: taken > missed > pending; among same status, keep latest
+
       const priority = { taken: 0, missed: 1, pending: 2 };
       docs.sort((a, b) => {
         const sp = (priority[a.status] ?? 3) - (priority[b.status] ?? 3);
@@ -70,25 +67,14 @@ console.log("📊 Weekly retraining job started...");
     console.error("❌ Error during retraining:", err);
   }
 });;
-cron.schedule("0 0 * * 0", async () => {
-  console.log("🧠 Weekly health insights generation started...");
-  try {
-    await generateWeeklyInsightsForAllUsers();
-    console.log("✅ Weekly health insights generated");
-  } catch (err) {
-    console.error("❌ Health insights cron failed:", err);
-  }
-});
+
 connectDB()
   .then(async () => {
     console.log("🟢 MongoDB connected, starting one-time ML training...");
 
-    // 🧹 Clean up duplicate reminders from old buggy cron runs
     await cleanupDuplicateReminders();
 
-    // 🔥 TEMPORARY: run training once
     await trainAdherenceModel()
-    await generateWeeklyInsightsForAllUsers()
     const PORT = process.env.PORT || 8000;
     app.listen(PORT, () => {
       console.log(`✅ Server is running at ${PORT}`);

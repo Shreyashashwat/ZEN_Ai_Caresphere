@@ -26,6 +26,11 @@ const appointmentSchema = new mongoose.Schema(
       enum: ["PENDING", "SCHEDULED", "COMPLETED", "CANCELLED"],
       default: "PENDING",
     },
+    reportId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AppointmentReport",
+      default: null,
+    },
   },
   { timestamps: true }
 );

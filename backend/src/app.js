@@ -5,12 +5,14 @@ import userRouters from "./routes/user.routes.js"
 import medicineRoutes from "./routes/medicine.routes.js"
 import reminderRoutes from "./routes/reminder.routes.js"
 import chatbotRoute from "./routes/chatbot.routes.js"
+import agentDataRoutes from "./routes/agentData.routes.js"
 import saveNotificationToken from "./firebase/routes.js"
 import caregiverRoutes from "./routes/caregiver.routes.js"
 import googleAuth from "./routes/googleapis.routes.js"
 import googleCalendarRoutes from "./routes/googleCalender.routes.js";
 import doctorPatientRoutes from "./routes/doctorPatient.routes.js";
 import mlRoutes from "./routes/ml.routes.js"
+import weeklyInsightsRoutes from "./routes/weeklyInsights.routes.js"
 import { createRemindersCron } from "./firebase/remindercreationfile.js"
 import { sendnoti } from "./firebase/SendNotification.js"
 
@@ -46,8 +48,13 @@ app.use("/api/v1/save-token", saveNotificationToken)
 app.use("/api/v1", googleAuth)
 app.use("/api/v1/google", googleCalendarRoutes);
 app.use("/api/v1", doctorPatientRoutes);
+app.use("/api/v1", agentDataRoutes);
+
+import testQueueRoutes from "./routes/testQueue.js";
+app.use("/api/test", testQueueRoutes);
 // In your routes file
 app.use("/api", mlRoutes);
+app.use("/api/weekly-insights", weeklyInsightsRoutes);
 sendnoti()
 createRemindersCron();
 
