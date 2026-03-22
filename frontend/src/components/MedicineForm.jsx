@@ -16,7 +16,6 @@ const MedicineForm = ({ onSuccess, medicine }) => {
   const [medicineValid, setMedicineValid] = useState(true);
   const [checkingMedicine, setCheckingMedicine] = useState(false);
 
-  // Fill form if editing
   useEffect(() => {
     if (medicine) {
       setFormData({
@@ -25,11 +24,9 @@ const MedicineForm = ({ onSuccess, medicine }) => {
         frequency: medicine.frequency || "daily",
         time: medicine.time || [""],
         startDate: medicine.startDate
-          ? new Date(medicine.startDate).toISOString().split("T")[0]
-          : "",
+          ? new Date(medicine.startDate).toISOString().split("T")[0] : "",
         endDate: medicine.endDate
-          ? new Date(medicine.endDate).toISOString().split("T")[0]
-          : "",
+          ? new Date(medicine.endDate).toISOString().split("T")[0] : "",
       });
       setIsEditing(true);
     }
@@ -80,9 +77,16 @@ const MedicineForm = ({ onSuccess, medicine }) => {
   const addTimeField = () =>
     setFormData({ ...formData, time: [...formData.time, ""] });
 
-  const removeTimeField = (index) => {
-    const newTimes = formData.time.filter((_, i) => i !== index);
-    setFormData({ ...formData, time: newTimes });
+  const removeTimeField = (index) =>
+    setFormData({ ...formData, time: formData.time.filter((_, i) => i !== index) });
+
+  const showSuccess = (msg) => {
+    setSuccessMsg(msg); setErrorMsg("");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+  const showError = (msg) => {
+    setErrorMsg(msg); setSuccessMsg("");
+    setTimeout(() => setErrorMsg(""), 4000);
   };
 
   const handleSubmit = async (e) => {
@@ -97,7 +101,7 @@ const MedicineForm = ({ onSuccess, medicine }) => {
     try {
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user || !user._id) {
-        alert("User not found. Please log in again.");
+        showError("User not found. Please log in again.");
         setLoading(false);
         return;
       }
@@ -108,11 +112,12 @@ const MedicineForm = ({ onSuccess, medicine }) => {
       };
 
       let medicineId;
+      const wasEditing = isEditing;
+      const savedFormData = { ...formData }; // snapshot before reset
 
       if (isEditing) {
         const res = await updateMedicine(medicine._id, medicineData);
         medicineId = res.data.data._id;
-        alert("Medicine updated successfully!");
       } else {
         const res = await addMedicine(medicineData);
         medicineId = res.data.data._id;
@@ -169,10 +174,46 @@ const MedicineForm = ({ onSuccess, medicine }) => {
       });
       setIsEditing(false);
 
+     
       if (onSuccess) onSuccess();
+
+      showSuccess(wasEditing ? "Medicine updated!" : "Medicine added!");
+
+      
+      if (!wasEditing) {
+        (async () => {
+          try {
+            for (const t of savedFormData.time) {
+              const start = new Date(savedFormData.startDate);
+              const end = savedFormData.endDate ? new Date(savedFormData.endDate) : start;
+              const step = savedFormData.frequency === "daily" ? 1
+                : savedFormData.frequency === "weekly" ? 7 : 0;
+
+              for (let d = new Date(start); step > 0 && d <= end; d.setDate(d.getDate() + step)) {
+                const [hours, minutes] = t.split(":");
+                const reminderTime = new Date(d);
+                reminderTime.setHours(hours, minutes, 0, 0);
+                await addReminder({ medicineId, time: reminderTime.toISOString() });
+              }
+
+              if (savedFormData.frequency === "as needed") {
+                const [hours, minutes] = t.split(":");
+                const reminderTime = new Date(start);
+                reminderTime.setHours(hours, minutes, 0, 0);
+                await addReminder({ medicineId, time: reminderTime.toISOString(), status: "pending" });
+              }
+            }
+            
+            if (onSuccess) onSuccess();
+          } catch (err) {
+            console.warn("⚠️ Background reminder creation error:", err.message);
+          }
+        })();
+      }
+
     } catch (err) {
       console.error(err);
-      alert("Failed to save medicine or reminders");
+      showError("Failed to save medicine. Please try again.");
     } finally {
       setLoading(false);
     }

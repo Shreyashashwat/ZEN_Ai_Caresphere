@@ -167,8 +167,8 @@ const ConnectedFamilyHealth = () => {
       try {
         const res = await getMyCaregivers();
         const all = res.data.data || [];
-        // Only show active members where we are the caregiver (direction=accepted) and memberId exists
-        const connected = all.filter(m => m.status === 'Active' && m.direction === 'accepted' && m.memberId);
+        // Show active family connections in both directions.
+        const connected = all.filter(m => m.status === 'Active' && m.memberId);
         setMembers(connected);
       } catch {
         console.error('Failed to load family members');
@@ -176,6 +176,19 @@ const ConnectedFamilyHealth = () => {
         setLoading(false);
       }
     })();
+    const handleFamilyUpdated = async () => {
+      try {
+        const res = await getMyCaregivers();
+        const all = res.data.data || [];
+        const connected = all.filter(m => m.status === 'Active' && m.memberId);
+        setMembers(connected);
+      } catch {
+        console.error('Failed to refresh family members');
+      }
+    };
+
+    window.addEventListener('caresphere:family-updated', handleFamilyUpdated);
+    return () => window.removeEventListener('caresphere:family-updated', handleFamilyUpdated);
   }, []);
 
   if (loading) return (

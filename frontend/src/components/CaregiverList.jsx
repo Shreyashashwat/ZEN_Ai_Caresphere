@@ -21,6 +21,12 @@ const CaregiverList = () => {
 
     useEffect(() => {
         fetchFamilyMembers();
+        const handleFamilyUpdated = () => {
+            fetchFamilyMembers();
+        };
+
+        window.addEventListener('caresphere:family-updated', handleFamilyUpdated);
+        return () => window.removeEventListener('caresphere:family-updated', handleFamilyUpdated);
     }, []);
 
     const handleFamilyMemberAdded = () => {
@@ -31,6 +37,7 @@ const CaregiverList = () => {
         if (!window.confirm("Are you sure you want to remove this family member from your circle?")) return;
         try {
             await deleteCaregiver(id);
+            window.dispatchEvent(new CustomEvent('caresphere:family-updated', { detail: { action: 'delete', id } }));
             fetchFamilyMembers();
         } catch (error) {
             console.error("Failed to remove family member", error);

@@ -1,18 +1,6 @@
-import React, { useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { UserContext } from "../context/UserContext";
+import React from "react";
 
 const Header = () => {
-  const navigate = useNavigate();
-  const { user, setUser, setToken } = useContext(UserContext);
-
-  const handleSignOut = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    setToken(null);
-    navigate("/");
-  };
-
   return (
     <header className="bg-gradient-to-r from-blue-500 to-indigo-600 px-10 py-4 text-white flex items-center justify-between shadow-lg">
 
@@ -53,15 +41,6 @@ const Header = () => {
             </li>
           </ul>
         </nav>
-
-        {user && (
-          <button
-            onClick={handleSignOut}
-            className="bg-white/20 hover:bg-white/30 text-white font-semibold px-6 py-2 rounded-full transition-colors duration-200 border border-white/30"
-          >
-            Sign Out
-          </button>
-        )}
       </div>
     </header>
   );

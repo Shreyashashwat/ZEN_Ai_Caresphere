@@ -28,6 +28,7 @@ const AlertsView = () => {
     const handleResponse = async (id, action) => {
         try {
             await respondToInvite(id, action);
+            window.dispatchEvent(new CustomEvent('caresphere:family-updated', { detail: { action, id } }));
             fetchInvites(); // Refresh list
         } catch (error) {
             console.error("Failed to respond", error);

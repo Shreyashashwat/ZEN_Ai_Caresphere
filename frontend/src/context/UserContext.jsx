@@ -1,19 +1,20 @@
 
-import React, { createContext, useState } from "react";
+import React, { createContext, useState, useEffect } from "react";
 
 export const UserContext = createContext();
 
-const getStoredUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem("user")) || null;
-  } catch {
-    return null;
-  }
-};
-
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(getStoredUser);
-  const [token, setToken] = useState(() => getStoredUser()?.token || null);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+
+
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    if (storedUser) {
+      setUser(storedUser);
+      setToken(storedUser.token || null);
+    }
+  }, []);
 
   return (
     <UserContext.Provider value={{ user, setUser, token, setToken }}>

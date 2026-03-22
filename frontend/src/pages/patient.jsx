@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateStatsReport, generateWeeklyReport } from '../utils/reportGenerator';
+import { jsPDF } from "jspdf";
 
 import MedicineList from "../components/MedicineList";
 import MedicineForm from "../components/MedicineForm";
@@ -10,7 +11,7 @@ import DashboardChart from "../components/DashboardChart";
 import CaregiverList from "../components/CaregiverList";
 import AlertsView from "../components/Caregiver/AlertsView";
 import ConnectedFamilyHealth from "../components/ConnectedFamilyHealth";
-
+import InsightsTab from "../components/InsightsTab";
 import {
   getMedicines,
   fetchHistory,
@@ -20,8 +21,21 @@ import {
   getPatientRequests,
   createAppointment,
   getDoctorAppointments,
+  getPatientReports,
+  markPatientReportRead,
+  addDailyHealthNote,
+  getMyDailyHealthNotes,
 } from "../api";
 
+const filterOutPreReminders = (list) =>
+  list.filter(item => {
+    const itemTime = new Date(item.time).getTime();
+    return !list.some(r => {
+      const diff = new Date(r.time).getTime() - itemTime;
+      return diff === 900000 &&
+        (r.medicineId?._id || r.medicineId) === (item.medicineId?._id || item.medicineId);
+    });
+  });
 const Patient = () => {
   const navigate = useNavigate();
 
@@ -38,10 +52,21 @@ const Patient = () => {
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
   const [weeklyInsights, setWeeklyInsights] = useState([]);
+  const [weeklyTrend, setWeeklyTrend] = useState([]);
+  const [insightsMeta, setInsightsMeta] = useState(null); // { adherenceRate, weeklyTrendLabel, streak, mostMissedTime, worstMedicine }
+  const [generatingInsights, setGeneratingInsights] = useState(false);
+  const [cooldownMins, setCooldownMins] = useState(null);
+  const [patientReports, setPatientReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
 
   // My Doctor tab
   const [appointments, setAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [isScrolledPastHeader, setIsScrolledPastHeader] = useState(false);
+  const [dailyNotes, setDailyNotes] = useState([]);
+  const [dailyNoteInput, setDailyNoteInput] = useState("");
+  const [loadingDailyNotes, setLoadingDailyNotes] = useState(false);
+  const [savingDailyNote, setSavingDailyNote] = useState(false);
 
   // Appointment States
   const [showAptModal, setShowAptModal] = useState(false);
@@ -64,15 +89,77 @@ const Patient = () => {
 
   const user = JSON.parse(localStorage.getItem("user"));
   const username = user?.username || "User";
+  const patientInitial = String(username).charAt(0).toUpperCase() || "P";
 
-  // -------------------- FETCHERS --------------------
+  const tabItems = [
+    { key: "home", label: "Home", icon: HomeIcon },
+    { key: "history", label: "History", icon: HistoryIcon },
+    { key: "insights", label: "Insights", icon: InsightsIcon },
+    { key: "family", label: "Family", icon: FamilyIcon },
+    { key: "myDoctor", label: "My Doctor", icon: DoctorIcon },
+    { key: "reports", label: "Reports", icon: ReportsIcon },
+    { key: "stats", label: "Stats", icon: StatsIcon }
+  ];
+
+  const isResolvedDose = (status) => status === "taken" || status === "missed";
+
+  const getAuthToken = () => {
+    const stored = localStorage.getItem('user');
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return parsed?.data?.token || parsed?.token || null;
+  };
+
+
   const fetchWeeklyInsights = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/weekly-insights/${user._id}`);
+      const token = getAuthToken();
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${API_BASE}/api/weekly-insights/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       setWeeklyInsights(data?.insights || []);
+      setWeeklyTrend(data?.weeklyTrend || []);
+       if (data?.adherenceRate !== undefined) {
+      setInsightsMeta({
+        adherenceRate:    data.adherenceRate,
+        weeklyTrendLabel: data.weeklyTrendLabel,
+        streak:           data.streak,
+        mostMissedTime:   data.mostMissedTime,
+        worstMedicine:    data.worstMedicine,
+      });
+    }
     } catch (err) {
-      console.error("Failed to fetch weekly insights", err);
+      console.error('Failed to fetch weekly insights', err);
+    }
+  };
+
+  const handleGenerateInsights = async () => {
+    setGeneratingInsights(true);
+    try {
+      const token = getAuthToken();
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${API_BASE}/api/weekly-insights/generate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setWeeklyInsights(data?.insights || []);
+      setWeeklyTrend(data?.weeklyTrend || []);
+     setInsightsMeta({
+        adherenceRate:    data?.adherenceRate,
+        weeklyTrendLabel: data?.weeklyTrendLabel,
+        streak:           data?.streak,
+        mostMissedTime:   data?.mostMissedTime,
+        worstMedicine:    data?.worstMedicine,
+      });
+      if (data?.cooldownRemaining) setCooldownMins(data.cooldownRemaining);
+      else setCooldownMins(null);
+    } catch (err) {
+      console.error('Failed to generate insights', err);
+    } finally {
+      setGeneratingInsights(false);
     }
   };
 
@@ -85,6 +172,16 @@ useEffect(() => {
   }
 }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolledPastHeader(window.scrollY > 80);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const fetchMedicines = async () => {
     try {
       const res = await getMedicines();
@@ -95,17 +192,20 @@ useEffect(() => {
   };
 
   const handleDownloadReport = () => {
+    const resolvedHistory = history.filter((h) => isResolvedDose(h.status));
+
     const statsData = {
       totalMedicines: medicines.length,
       takenCount: history.filter(h => h.status === "taken").length,
       missedCount: history.filter(h => h.status === "missed").length,
-      adherenceRate: history.length > 0
-        ? Math.round((history.filter(h => h.status === "taken").length / history.length) * 100)
+      adherenceRate: resolvedHistory.length > 0
+        ? Math.round((history.filter(h => h.status === "taken").length / resolvedHistory.length) * 100)
         : 0,
       medicineStats: medicines.map(med => {
         const medHistory = history.filter(h => h.medicineId?._id === med._id || h.medicineId === med._id);
-        const taken = medHistory.filter(h => h.status === "taken").length;
-        const total = medHistory.length;
+        const resolvedMedHistory = medHistory.filter((h) => isResolvedDose(h.status));
+        const taken = resolvedMedHistory.filter(h => h.status === "taken").length;
+        const total = resolvedMedHistory.length;
         return {
           name: med.medicineName,
           taken,
@@ -124,6 +224,7 @@ useEffect(() => {
     sevenDaysAgo.setDate(now.getDate() - 7);
     
     const weeklyHistory = history.filter(h => new Date(h.time) >= sevenDaysAgo);
+    const resolvedWeeklyHistory = weeklyHistory.filter((h) => isResolvedDose(h.status));
     
     const dailyData = [];
     for (let i = 6; i >= 0; i--) {
@@ -133,12 +234,13 @@ useEffect(() => {
         const hDate = new Date(h.time);
         return hDate.toDateString() === date.toDateString();
       });
+      const resolvedDayHistory = dayHistory.filter((h) => isResolvedDose(h.status));
       
       dailyData.push({
         date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
         taken: dayHistory.filter(h => h.status === 'taken').length,
         missed: dayHistory.filter(h => h.status === 'missed').length,
-        total: dayHistory.length,
+        total: resolvedDayHistory.length,
       });
     }
     
@@ -146,14 +248,15 @@ useEffect(() => {
       totalMedicines: medicines.length,
       weeklyTaken: weeklyHistory.filter(h => h.status === 'taken').length,
       weeklyMissed: weeklyHistory.filter(h => h.status === 'missed').length,
-      weeklyAdherence: weeklyHistory.length > 0
-        ? Math.round((weeklyHistory.filter(h => h.status === 'taken').length / weeklyHistory.length) * 100)
+      weeklyAdherence: resolvedWeeklyHistory.length > 0
+        ? Math.round((weeklyHistory.filter(h => h.status === 'taken').length / resolvedWeeklyHistory.length) * 100)
         : 0,
       dailyBreakdown: dailyData,
       medicinePerformance: medicines.map(med => {
         const medWeeklyHistory = weeklyHistory.filter(h => h.medicineId?._id === med._id || h.medicineId === med._id);
-        const taken = medWeeklyHistory.filter(h => h.status === 'taken').length;
-        const total = medWeeklyHistory.length;
+        const resolvedMedWeeklyHistory = medWeeklyHistory.filter((h) => isResolvedDose(h.status));
+        const taken = resolvedMedWeeklyHistory.filter(h => h.status === 'taken').length;
+        const total = resolvedMedWeeklyHistory.length;
         return {
           name: med.medicineName,
           taken,
@@ -269,6 +372,30 @@ const fetchHistoryData = async () => {
     }
   };
 
+  const fetchPatientReportData = async () => {
+    setLoadingReports(true);
+    try {
+      const res = await getPatientReports();
+      setPatientReports(Array.isArray(res.data.data) ? res.data.data : []);
+    } catch (err) {
+      console.error("Failed to fetch patient reports:", err);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const fetchPatientDailyNotes = async () => {
+    setLoadingDailyNotes(true);
+    try {
+      const res = await getMyDailyHealthNotes();
+      setDailyNotes(Array.isArray(res.data.data) ? res.data.data : []);
+    } catch (err) {
+      console.error("Failed to fetch daily notes:", err);
+    } finally {
+      setLoadingDailyNotes(false);
+    }
+  };
+
   const fetchPatientRequests = async () => {
     try {
       const res = await getPatientRequests();
@@ -288,8 +415,20 @@ const fetchHistoryData = async () => {
   }, []);
 
   useEffect(() => {
+    const handleChatUpdated = async () => {
+      await Promise.all([fetchMedicines(), fetchHistoryData(), fetchReminders()]);
+      setRefreshTrigger((prev) => prev + 1);
+    };
+
+    window.addEventListener("caresphere:chat-updated", handleChatUpdated);
+    return () => window.removeEventListener("caresphere:chat-updated", handleChatUpdated);
+  }, []);
+
+  useEffect(() => {
     if (activeTab === "insights") fetchWeeklyInsights();
+    if (activeTab === "home") fetchPatientDailyNotes();
     if (activeTab === "myDoctor") { fetchAppointments(); fetchReminders(); }
+    if (activeTab === "reports") fetchPatientReportData();
   }, [activeTab]);
 
   useEffect(() => {
@@ -362,6 +501,115 @@ const fetchHistoryData = async () => {
     navigate("/");
   };
 
+  const handleMarkReportAsRead = async (reportId) => {
+    try {
+      await markPatientReportRead(reportId);
+      setPatientReports((prev) =>
+        prev.map((report) =>
+          report._id === reportId ? { ...report, isRead: true } : report
+        )
+      );
+    } catch (err) {
+      alert("Failed to mark report as read.");
+    }
+  };
+
+  const handleSaveDailyNote = async () => {
+    const note = dailyNoteInput.trim();
+    if (!note) {
+      alert("Please write a note before saving.");
+      return;
+    }
+
+    setSavingDailyNote(true);
+    try {
+      await addDailyHealthNote({ note });
+      setDailyNoteInput("");
+      await fetchPatientDailyNotes();
+      alert("Daily health note saved.");
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to save daily note");
+    } finally {
+      setSavingDailyNote(false);
+    }
+  };
+
+  const handleDownloadPatientReport = (report) => {
+    const doc = new jsPDF();
+    const safeDate = new Date().toISOString().slice(0, 10);
+
+    const doctorName = report?.doctorId?.username || "Doctor";
+    const doctorEmail = report?.doctorId?.email || "N/A";
+    const reportDate = report?.reportDate ? new Date(report.reportDate).toLocaleString() : "N/A";
+    const problem = report?.problem || "No issue noted";
+    const notes = report?.reviewNotes || "No review notes provided.";
+    const medicines = report?.medicines || [];
+
+    let y = 20;
+    const left = 14;
+    const pageBottom = 280;
+    const lineHeight = 7;
+
+    const addSectionTitle = (title) => {
+      if (y > pageBottom - 20) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text(title, left, y);
+      y += 8;
+    };
+
+    const addWrappedText = (text, indent = left) => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(String(text), 180 - (indent - left));
+      lines.forEach((line) => {
+        if (y > pageBottom) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, indent, y);
+        y += lineHeight;
+      });
+    };
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("CareSphere - Doctor Report", left, y);
+    y += 10;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Doctor: Dr. ${doctorName}`, left, y);
+    y += 7;
+    doc.text(`Doctor Email: ${doctorEmail}`, left, y);
+    y += 7;
+    doc.text(`Report Date: ${reportDate}`, left, y);
+    y += 10;
+
+    addSectionTitle("Problem");
+    addWrappedText(problem);
+    y += 4;
+
+    addSectionTitle("Prescribed Medicines");
+    if (medicines.length === 0) {
+      addWrappedText("No medicines prescribed");
+    } else {
+      medicines.forEach((med, idx) => {
+        const medicineLine = `${idx + 1}. ${med.medicineName || "Unknown"} - ${med.dosage || "N/A"}, ${med.frequency || "N/A"}`;
+        addWrappedText(medicineLine, left + 2);
+      });
+    }
+    y += 4;
+
+    addSectionTitle("Doctor Notes");
+    addWrappedText(notes);
+
+    doc.save(`doctor_report_${report?._id || safeDate}.pdf`);
+  };
+
   // Activity Log Processing Functions
   const getFilteredAndSearchedHistory = () => {
     let filtered = history;
@@ -416,8 +664,10 @@ const fetchHistoryData = async () => {
       filtered = filtered.sort((a, b) => {
         const aHistory = history.filter(h => h.medicineId?._id === a._id || h.medicineId === a._id);
         const bHistory = history.filter(h => h.medicineId?._id === b._id || h.medicineId === b._id);
-        const aRate = aHistory.length > 0 ? aHistory.filter(h => h.status === "taken").length / aHistory.length : 0;
-        const bRate = bHistory.length > 0 ? bHistory.filter(h => h.status === "taken").length / bHistory.length : 0;
+        const resolvedAHistory = aHistory.filter((h) => isResolvedDose(h.status));
+        const resolvedBHistory = bHistory.filter((h) => isResolvedDose(h.status));
+        const aRate = resolvedAHistory.length > 0 ? resolvedAHistory.filter(h => h.status === "taken").length / resolvedAHistory.length : 0;
+        const bRate = resolvedBHistory.length > 0 ? resolvedBHistory.filter(h => h.status === "taken").length / resolvedBHistory.length : 0;
         return bRate - aRate; // Highest adherence first
       });
     } else {
@@ -440,8 +690,9 @@ const fetchHistoryData = async () => {
   }, [treatmentOverviewSearch, treatmentOverviewSort]);
 
   // Calculate stats for quick view
-  const adherenceRate = history.length > 0 
-    ? Math.round((history.filter(h => h.status === 'taken').length / history.length) * 100)
+  const resolvedHistory = history.filter((h) => isResolvedDose(h.status));
+  const adherenceRate = resolvedHistory.length > 0 
+    ? Math.round((history.filter(h => h.status === 'taken').length / resolvedHistory.length) * 100)
     : 0;
   
   // Filter out AI-adjusted pre-reminders (reminders created 15 min before the actual dose)
@@ -467,134 +718,149 @@ const fetchHistoryData = async () => {
   })).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* ENHANCED HEADER */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl shadow-md border-b border-indigo-100">
-        <div className="max-w-7xl mx-auto flex justify-between items-center px-4 py-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <span className="text-white text-2xl font-extrabold">C</span>
-            </div>
-            <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-700 to-blue-600 bg-clip-text text-transparent tracking-tight">
-              CareSphere
-            </h1>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 items-center bg-gradient-to-r from-gray-50 to-gray-100 p-2 rounded-2xl shadow-inner">
-            <button
-              onClick={() => setActiveTab("home")}
-              className={`px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 ${
-                activeTab === "home" 
-                  ? "bg-white text-indigo-700 shadow-lg" 
-                  : "text-gray-600 hover:text-indigo-600 hover:bg-white/50"
-              }`}
-            >
-              🏠 Home
-            </button>
-            <button
-              onClick={() => setActiveTab("history")}
-              className={`px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 ${
-                activeTab === "history" 
-                  ? "bg-white text-blue-700 shadow-lg" 
-                  : "text-gray-600 hover:text-blue-600 hover:bg-white/50"
-              }`}
-            >
-              📋 History
-            </button>
-            <button
-              onClick={() => setActiveTab("insights")}
-              className={`px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 ${
-                activeTab === "insights" 
-                  ? "bg-white text-purple-700 shadow-lg" 
-                  : "text-gray-600 hover:text-purple-600 hover:bg-white/50"
-              }`}
-            >
-              🧠 Insights
-            </button>
-            <button
-              onClick={() => setActiveTab("family")}
-              className={`px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 ${
-                activeTab === "family" 
-                  ? "bg-white text-rose-700 shadow-lg" 
-                  : "text-gray-600 hover:text-rose-600 hover:bg-white/50"
-              }`}
-            >
-              💕 Family
-            </button>
-            <button
-              onClick={() => setActiveTab("myDoctor")}
-              className={`px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 ${
-                activeTab === "myDoctor" 
-                  ? "bg-white text-teal-700 shadow-lg" 
-                  : "text-gray-600 hover:text-teal-600 hover:bg-white/50"
-              }`}
-            >
-              🩺 My Doctor
-            </button>
-            <button
-              onClick={() => setActiveTab("stats")}
-              className={`px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-300 ${
-                activeTab === "stats" 
-                  ? "bg-white text-emerald-700 shadow-lg" 
-                  : "text-gray-600 hover:text-emerald-600 hover:bg-white/50"
-              }`}
-            >
-              📊 Stats
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 text-slate-800">
+      <div className="absolute inset-0 pointer-events-none opacity-70 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.22),_transparent_45%),radial-gradient(circle_at_10%_90%,_rgba(99,102,241,0.15),_transparent_42%)]" />
 
-      {/* ENHANCED WELCOME BANNER */}
-      <section className="max-w-7xl mx-auto px-4 py-8 mt-8">
-        <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-700 text-white rounded-[2rem] shadow-2xl shadow-indigo-300/50 overflow-hidden relative animate-fadeIn">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-24 translate-x-24"></div>
-          <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
-          
-          <div className="relative px-6 py-12 md:px-8 md:py-14">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-              <div className="flex-1">
-                <div className="flex items-center gap-4 mb-3">
-                  <span className="text-5xl">👋</span>
-                  <h2 className="text-4xl md:text-5xl font-black tracking-tight leading-tight">Welcome back, {username}!</h2>
-                </div>
-                <p className="text-indigo-100 text-xl font-medium tracking-wide">Let's keep you healthy today</p>
+      <aside
+        className={`hidden md:flex fixed left-4 w-64 z-40 transition-all duration-300 ${
+          isScrolledPastHeader ? "top-4 bottom-4" : "top-20 h-[calc(100vh-5rem)]"
+        }`}
+      >
+        <div className="w-full rounded-3xl bg-white/55 backdrop-blur-xl border border-white/40 shadow-[0_18px_55px_-25px_rgba(15,23,42,0.45)] p-5 flex flex-col overflow-hidden">
+          <div className="h-1.5 -mx-5 -mt-5 mb-5 bg-gradient-to-r from-blue-500 to-indigo-600" />
+          <div className="mb-6 pb-4 border-b border-slate-200/70">
+            <h1 className="text-2xl font-black tracking-tight text-indigo-700">CareSphere.</h1>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-500 mt-1">Patient Portal</p>
+            <p className="text-xs text-slate-500 mt-1">Logged in as {username}</p>
+          </div>
+
+          <nav className="space-y-2">
+            {tabItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = item.key === activeTab;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveTab(item.key)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                    isActive
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30"
+                      : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-auto flex items-center justify-center gap-2 text-sm font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 px-4 py-2 rounded-full transition-all duration-300"
+          >
+            <LogoutIcon className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <div className="relative z-10 md:ml-72 pb-10">
+        <header className="sticky top-0 z-50 px-4 sm:px-6 pt-4">
+          <div className="rounded-2xl bg-white/60 backdrop-blur-xl border border-white/40 shadow-[0_12px_35px_-20px_rgba(15,23,42,0.55)] px-4 sm:px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] font-bold text-indigo-600">Patient Dashboard</p>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Your Health Command Center</h2>
               </div>
-              
-              <div className="flex flex-wrap gap-5">
-                <div className="bg-white/10 backdrop-blur-sm px-7 py-5 rounded-2xl border-2 border-white/20 hover:bg-white/15 transition-all duration-300">
-                  <div className="text-sm font-bold text-indigo-100 mb-2 uppercase tracking-wider">Adherence Rate</div>
-                  <div className="text-4xl font-black">{adherenceRate}%</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm px-7 py-5 rounded-2xl border-2 border-white/20 hover:bg-white/15 transition-all duration-300">
-                  <div className="text-sm font-bold text-indigo-100 mb-2 uppercase tracking-wider">Today's Reminders</div>
-                  <div className="text-4xl font-black">{todayReminders}</div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="relative h-10 w-10 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all duration-300 flex items-center justify-center"
+                >
+                  <BellIcon className="h-5 w-5" />
+                  <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-rose-500" />
+                </button>
+
+                <div className="flex items-center gap-2 rounded-xl bg-white/70 px-2.5 py-2 border border-white/50">
+                  <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white font-bold flex items-center justify-center">
+                    {patientInitial}
+                  </div>
+                  <div className="hidden sm:block leading-tight">
+                    <p className="text-sm font-semibold text-slate-800">{username}</p>
+                    <p className="text-xs text-slate-500">Patient</p>
+                  </div>
                 </div>
               </div>
             </div>
-            
-            <div className="mt-8 bg-white/10 backdrop-blur-sm p-6 rounded-2xl border-2 border-white/20 hover:bg-white/15 transition-all duration-300">
-              <div className="flex items-center gap-4">
-                <span className="text-3xl">⏰</span>
+
+            <div className="md:hidden mt-4 -mx-1 overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 px-1 pb-1 min-w-max">
+                {tabItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = item.key === activeTab;
+                  return (
+                    <button
+                      key={`mobile-${item.key}`}
+                      type="button"
+                      onClick={() => setActiveTab(item.key)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                        isActive ? "bg-indigo-600 text-white" : "bg-white/75 text-slate-600"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-5 py-7 mt-1">
+          <div className="rounded-[2rem] bg-gradient-to-r from-indigo-600 via-indigo-700 to-blue-700 text-white shadow-2xl shadow-indigo-300/40 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-24 translate-x-24" />
+            <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-24 -translate-x-24" />
+
+            <div className="relative p-6 md:p-8">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                 <div>
-                  <div className="text-xs text-indigo-100 uppercase tracking-[0.15em] font-extrabold mb-1">Next Reminder</div>
-                  <div className="text-xl font-bold tracking-wide">
-                    {nextReminder
-                      ? `${new Date(nextReminder.time).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })} — ${nextReminder.medicineId?.medicineName}`
-                      : "No upcoming reminders"}
+                  <h2 className="text-3xl md:text-4xl font-black tracking-tight">Welcome back, {username}</h2>
+                  <p className="text-indigo-100 mt-1 font-medium">Let's keep your treatment plan on track today.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  <HeroMetricCard title="Adherence" value={`${adherenceRate}%`} icon={<CheckCircleIcon className="h-5 w-5" />} />
+                  <HeroMetricCard title="Today" value={todayReminders} icon={<ClockIcon className="h-5 w-5" />} />
+                </div>
+              </div>
+
+              <div className="mt-6 bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/20">
+                <div className="flex items-center gap-3">
+                  <ClockIcon className="h-6 w-6 text-indigo-100" />
+                  <div>
+                    <div className="text-[11px] text-indigo-100 uppercase tracking-[0.15em] font-extrabold mb-1">Next Reminder</div>
+                    <div className="text-base sm:text-lg font-bold tracking-wide">
+                      {nextReminder
+                        ? `${new Date(nextReminder.time).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          })} - ${nextReminder.medicineId?.medicineName}`
+                        : "No upcoming reminders"}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {activeTab === "home" ? (
-        <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-5 py-7 space-y-7">
           {/* MEDICINE MANAGEMENT - ENHANCED */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 animate-fadeIn hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
@@ -619,11 +885,79 @@ const fetchHistoryData = async () => {
               <CalendarView reminders={reminders} />
             </div>
           </section>
+
+          {/* DAILY HEALTH NOTES */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-gray-800 flex items-center gap-3">
+                  <span className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center text-xl shadow-lg">📝</span>
+                  Daily Health Notes
+                </h2>
+                <p className="text-gray-500 text-sm mt-1 ml-13">Write quick daily updates for your doctor to review.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-md p-6">
+                <p className="text-xs uppercase tracking-[0.14em] font-bold text-cyan-600 mb-2">Today's Note</p>
+                <textarea
+                  value={dailyNoteInput}
+                  onChange={(e) => setDailyNoteInput(e.target.value)}
+                  placeholder="Example: Felt better after breakfast. Mild headache in afternoon."
+                  rows={6}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                />
+                <button
+                  onClick={handleSaveDailyNote}
+                  disabled={savingDailyNote}
+                  className="mt-3 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white text-sm font-bold transition-colors"
+                >
+                  {savingDailyNote ? "Saving..." : "Save Daily Note"}
+                </button>
+              </div>
+
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-md p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs uppercase tracking-[0.14em] font-bold text-slate-500">Recent Notes</p>
+                  <button
+                    onClick={fetchPatientDailyNotes}
+                    className="px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {loadingDailyNotes ? (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-16 rounded-xl bg-slate-100" />
+                    <div className="h-16 rounded-xl bg-slate-100" />
+                  </div>
+                ) : dailyNotes.length === 0 ? (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center">
+                    <p className="text-sm font-semibold text-slate-600">No notes yet</p>
+                    <p className="text-xs text-slate-400 mt-1">Your saved daily notes will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                    {dailyNotes.slice(0, 12).map((note) => (
+                      <div key={note._id} className="rounded-2xl border border-cyan-100 bg-cyan-50/40 p-3">
+                        <p className="text-xs font-bold text-cyan-700 mb-1">
+                          {new Date(note.noteDate || note.createdAt).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{note.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         </main>
         
       ) : activeTab === "myDoctor" ? (
         /* MY DOCTOR TAB */
-        <main className="max-w-7xl mx-auto px-4 py-8 space-y-10">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-5 py-7 space-y-8">
 
           {/* HEALTHCARE NETWORK */}
           <section>
@@ -890,11 +1224,107 @@ const fetchHistoryData = async () => {
               );
             })()}
           </section>
+
+          {/* PAST APPOINTMENTS */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-gray-800 flex items-center gap-3">
+                  <span className="w-10 h-10 bg-gradient-to-br from-slate-500 to-slate-700 rounded-xl flex items-center justify-center text-xl shadow-lg">🗂</span>
+                  Past Appointments
+                </h2>
+                <p className="text-gray-500 text-sm mt-1 ml-13">Review completed, declined, and missed past appointments</p>
+              </div>
+              <button
+                onClick={fetchAppointments}
+                className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {loadingAppointments ? (
+              <div className="flex justify-center p-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-slate-600" />
+              </div>
+            ) : (() => {
+              const now = new Date();
+              const pastApts = appointments
+                .filter((a) => {
+                  const aptDate = new Date(a.appointmentDate);
+                  const status = a.status?.toLowerCase();
+                  return aptDate < now || status === "completed" || status === "rejected";
+                })
+                .sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate));
+
+              const statusStyles = {
+                completed: "bg-blue-50 text-blue-700 border-blue-200",
+                rejected: "bg-rose-50 text-rose-700 border-rose-200",
+                accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                pending: "bg-amber-50 text-amber-700 border-amber-200"
+              };
+
+              if (pastApts.length === 0) {
+                return (
+                  <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-12 text-center shadow-sm">
+                    <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl">🗂</div>
+                    <h3 className="text-lg font-bold text-gray-700 mb-1">No past appointments yet</h3>
+                    <p className="text-gray-400 text-sm">Your appointment history will appear here after your first consultation.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {pastApts.map((apt) => {
+                    const aptDate = new Date(apt.appointmentDate);
+                    const statusKey = apt.status?.toLowerCase() || "pending";
+                    const statusClass = statusStyles[statusKey] || statusStyles.pending;
+
+                    return (
+                      <div key={apt._id} className="bg-white rounded-2xl shadow-sm hover:shadow-lg border border-gray-100 hover:border-slate-200 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden">
+                        <div className="h-1 w-full bg-gradient-to-r from-slate-500 to-slate-700" />
+                        <div className="p-5">
+                          <div className="flex items-start justify-between gap-3 mb-4">
+                            <div className="min-w-0">
+                              <p className="font-black text-gray-800 text-sm truncate">{apt.doctorId?.username || "Doctor"}</p>
+                              <p className="text-[11px] text-gray-400 truncate">{apt.doctorId?.email || ""}</p>
+                            </div>
+                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-xl border uppercase ${statusClass}`}>
+                              {apt.status || "PENDING"}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 text-gray-600">
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                              <span>🗓</span>
+                              <span>{aptDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                              <span>🕐</span>
+                              <span>{aptDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                            </div>
+                            {apt.problem && (
+                              <div className="mt-2 p-2.5 bg-slate-50 rounded-xl">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-0.5">Reason</p>
+                                <p className="text-xs text-slate-600 line-clamp-2">{apt.problem}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </section>
+
         </main>
 
       ) : activeTab === "history" ? (
         /* MEDICATION HISTORY SECTION - ENHANCED */
-        <section className="max-w-7xl mx-auto px-4 py-8 space-y-6 animate-fadeIn">
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-5 py-7 space-y-6 animate-fadeIn">
           <div className="bg-white rounded-3xl shadow-2xl border-2 border-blue-100 overflow-hidden">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-6 border-b border-blue-200">
@@ -1043,7 +1473,7 @@ const fetchHistoryData = async () => {
         
       ) : activeTab === "family" ? (
         /* FAMILY CIRCLE - FROM SECOND FILE */
-        <section className="max-w-5xl mx-auto px-4 py-12 space-y-8">
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-5 py-9 space-y-7">
           {/* Pending Invites Section */}
           <div className="bg-white rounded-3xl shadow-xl border border-amber-100 overflow-hidden">
             <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
@@ -1093,10 +1523,105 @@ const fetchHistoryData = async () => {
             </div>
           </div>
         </section>
+
+      ) : activeTab === "reports" ? (
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-5 py-9 space-y-7">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+                <span className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center text-white">📄</span>
+                Doctor Reports
+              </h2>
+              <p className="text-slate-500 text-sm mt-1">Reports sent by your doctor after completed appointments.</p>
+            </div>
+            <button
+              onClick={fetchPatientReportData}
+              className="px-4 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {loadingReports ? (
+            <div className="flex justify-center p-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-100 border-t-indigo-600" />
+            </div>
+          ) : patientReports.length === 0 ? (
+            <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-16 text-center shadow-sm">
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl">📭</div>
+              <h3 className="text-lg font-bold text-slate-700 mb-1">No Reports Yet</h3>
+              <p className="text-slate-400 text-sm">Completed appointment reports from your doctor will appear here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {patientReports.map((report) => (
+                <div key={report._id} className="bg-white rounded-3xl border border-slate-100 shadow-lg overflow-hidden">
+                  <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 to-blue-600" />
+                  <div className="p-6 space-y-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.14em] font-bold text-indigo-500">Doctor</p>
+                        <h3 className="text-lg font-black text-slate-800">Dr. {report.doctorId?.username || "Doctor"}</h3>
+                        <p className="text-xs text-slate-500">{report.doctorId?.email || ""}</p>
+                      </div>
+                      <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${report.isRead ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                        {report.isRead ? "Read" : "Unread"}
+                      </span>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                      <p className="text-xs uppercase tracking-[0.14em] font-bold text-slate-500 mb-1">Problem</p>
+                      <p className="text-sm font-semibold text-slate-700">{report.problem || "No issue noted"}</p>
+                      <p className="text-xs text-slate-500 mt-2">Report Date: {new Date(report.reportDate).toLocaleString()}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Prescribed Medicines</p>
+                      <div className="space-y-2">
+                        {(report.medicines || []).map((med, idx) => (
+                          <div key={`${report._id}-${idx}`} className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2">
+                            <p className="text-sm font-bold text-blue-900">{med.medicineName}</p>
+                            <p className="text-xs text-blue-700">{med.dosage} • {med.frequency}</p>
+                          </div>
+                        ))}
+                        {(!report.medicines || report.medicines.length === 0) && (
+                          <p className="text-sm text-slate-500 italic">No medicines listed in this report.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-indigo-50 border border-indigo-100 p-4">
+                      <p className="text-xs uppercase tracking-[0.14em] font-bold text-indigo-500 mb-1">Doctor Notes</p>
+                      <p className="text-sm text-indigo-900 whitespace-pre-wrap">{report.reviewNotes || "No review notes provided."}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleDownloadPatientReport(report)}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-colors"
+                      >
+                        Download Report
+                      </button>
+
+                      {!report.isRead && (
+                        <button
+                          onClick={() => handleMarkReportAsRead(report._id)}
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors"
+                        >
+                          Mark As Read
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
         
       ) : activeTab === "stats" ? (
         /* PREMIUM VITAL STATISTICS SECTION - FROM SECOND FILE */
-        <section className="max-w-7xl mx-auto px-4 py-12 space-y-10">
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-5 py-9 space-y-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
               <h2 className="text-4xl font-black text-indigo-900 tracking-tight flex items-center gap-3">
@@ -1407,62 +1932,17 @@ const fetchHistoryData = async () => {
           </div>
         </section>
         
-      ) : (
-        /* HEALTH INSIGHTS - ENHANCED */
-        <section className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">
-              🧠
-            </div>
-            <h2 className="text-3xl font-black bg-gradient-to-r from-purple-700 to-pink-600 bg-clip-text text-transparent">
-              AI Health Insights
-            </h2>
-          </div>
-          
-          {weeklyInsights.length === 0 ? (
-            <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-20 text-center shadow-lg">
-              <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full mx-auto mb-6 flex items-center justify-center text-5xl">
-                🤖
-              </div>
-              <h3 className="text-xl font-bold text-gray-700 mb-2">Analyzing Your Health Data</h3>
-              <p className="text-gray-400 max-w-md mx-auto">
-                Our AI is processing your medication history. Check back in a few days for personalized weekly insights.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {weeklyInsights.map((insight, idx) => (
-                <div 
-                  key={idx} 
-                  className="group bg-white rounded-3xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="text-xs px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 font-black uppercase tracking-wider border border-indigo-100">
-                      {insight.category}
-                    </span>
-                    <span className={`text-xs font-black px-3 py-1.5 rounded-xl ${
-                      insight.priority === "high" 
-                        ? "bg-red-50 text-red-600 border border-red-100" 
-                        : insight.priority === "medium" 
-                        ? "bg-yellow-50 text-yellow-600 border border-yellow-100" 
-                        : "bg-green-50 text-green-600 border border-green-100"
-                    }`}>
-                      {insight.priority.toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-gray-700 text-sm leading-relaxed font-medium">{insight.text}</p>
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <span>💡</span>
-                      <span>AI-Generated Insight</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+      ) : activeTab === "insights" ? (
+  <InsightsTab
+    weeklyInsights={weeklyInsights}
+    weeklyTrend={weeklyTrend}
+    insightsMeta={insightsMeta}
+    generatingInsights={generatingInsights}
+    cooldownMins={cooldownMins}
+    handleGenerateInsights={handleGenerateInsights}
+    setActiveTab={setActiveTab}
+  />
+) : null}
 
       {/* APPOINTMENT MODAL - ENHANCED */}
       {showAptModal && (
@@ -1633,8 +2113,114 @@ const fetchHistoryData = async () => {
           scrollbar-color: rgba(129, 140, 248, 0.5) rgba(79, 70, 229, 0.05);
         }
       `}</style>
+      </div>
     </div>
   );
 };
+
+const HeroMetricCard = ({ title, value, icon }) => (
+  <div className="bg-white/10 backdrop-blur-sm px-4 py-4 rounded-2xl border border-white/20 min-w-[130px]">
+    <div className="flex items-center justify-between gap-2 text-indigo-100">
+      <span className="text-[10px] font-bold uppercase tracking-[0.14em]">{title}</span>
+      <span>{icon}</span>
+    </div>
+    <div className="text-2xl sm:text-3xl font-black mt-2">{value}</div>
+  </div>
+);
+
+const IconBase = ({ className = "h-4 w-4", children }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+    {children}
+  </svg>
+);
+
+const HomeIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M3 11.5 12 4l9 7.5" />
+    <path d="M6 10v10h12V10" />
+  </IconBase>
+);
+
+const HistoryIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M12 8v5l3 2" />
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v4h4" />
+  </IconBase>
+);
+
+const InsightsIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M9.5 18h5" />
+    <path d="M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3 11.2c.6.4 1 1 1 1.8h4c0-.8.4-1.4 1-1.8A6 6 0 0 0 12 3Z" />
+  </IconBase>
+);
+
+const FamilyIcon = ({ className }) => (
+  <IconBase className={className}>
+    <circle cx="9" cy="9" r="2.5" />
+    <circle cx="15" cy="9" r="2.5" />
+    <path d="M4.5 18a4.5 4.5 0 0 1 9 0" />
+    <path d="M10.5 18a4.5 4.5 0 0 1 9 0" />
+  </IconBase>
+);
+
+const DoctorIcon = ({ className }) => (
+  <IconBase className={className}>
+    <circle cx="12" cy="8" r="3" />
+    <path d="M7 20a5 5 0 0 1 10 0" />
+    <path d="M19 6v4" />
+    <path d="M17 8h4" />
+  </IconBase>
+);
+
+const StatsIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M4 20h16" />
+    <rect x="6" y="11" width="3" height="6" rx="0.8" />
+    <rect x="11" y="7" width="3" height="10" rx="0.8" />
+    <rect x="16" y="4" width="3" height="13" rx="0.8" />
+  </IconBase>
+);
+
+const ReportsIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M7 3h8l4 4v14H7z" />
+    <path d="M15 3v4h4" />
+    <path d="M10 13h6" />
+    <path d="M10 17h6" />
+  </IconBase>
+);
+
+const BellIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M15 18H9" />
+    <path d="M6.5 16.5c1.4-1.5 1.5-3 1.5-6a4 4 0 1 1 8 0c0 3 .1 4.5 1.5 6" />
+    <path d="M10 18a2 2 0 0 0 4 0" />
+  </IconBase>
+);
+
+const LogoutIcon = ({ className }) => (
+  <IconBase className={className}>
+    <path d="M10 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h5" />
+    <path d="M14 8l4 4-4 4" />
+    <path d="M18 12H8" />
+  </IconBase>
+);
+
+const CheckCircleIcon = ({ className }) => (
+  <IconBase className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8.5 12 2.2 2.2 4.8-4.8" />
+  </IconBase>
+);
+
+const ClockIcon = ({ className }) => (
+  <IconBase className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </IconBase>
+);
 
 export default Patient;

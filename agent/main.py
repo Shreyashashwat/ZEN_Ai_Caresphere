@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agent.agent_executer import run_agent
+from agent.agent_executor import run_agent
 from agent.utils.memory_store import append_messages, clear_session, get_history
 
 load_dotenv()

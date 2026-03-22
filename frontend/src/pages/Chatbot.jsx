@@ -1,16 +1,22 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
 function ChatWidget() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const sessionId = useRef(uuidv4());
   const messagesEndRef = useRef(null);
 
-  const storedUser = JSON.parse(localStorage.getItem("user"));
-  const userId = storedUser?._id;
-  const authToken = storedUser?.token;
+  // Read auth info from localStorage
+  const userRaw = localStorage.getItem("user");
+  const parsed = userRaw ? JSON.parse(userRaw) : null;
+  // Shape stored at login: { _id, username, role, token }
+  const authToken = parsed?.token ?? parsed?.data?.token ?? "";
+  const userId = parsed?._id ?? parsed?.data?.user?._id ?? parsed?.data?._id ?? "";
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -18,20 +24,34 @@ function ChatWidget() {
 
   const toggleChat = () => setIsOpen((prev) => !prev);
 
+  const startNewChat = async () => {
+    try {
+      await axios.delete(
+        `http://localhost:8000/api/v1/chatbot/session/${sessionId.current}`,
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+    } catch (e) {}
+    sessionId.current = uuidv4();
+    setMessages([]);
+  };
+
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
 
     const userMessage = { from: "user", text: inputText };
     setMessages((msgs) => [...msgs, userMessage]);
+    const currentInput = inputText;   
     setInputText("");
     setIsLoading(true);
 
     try {
-      console.log("Sending message with token:", authToken);
-
       const resp = await axios.post(
         "http://localhost:8000/api/v1/chatbot",
-        { userId, message: inputText },
+        {
+          userId,
+          message: currentInput,       
+          sessionId: sessionId.current, 
+        },
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -40,8 +60,18 @@ function ChatWidget() {
         }
       );
 
-      const botReply = resp.data.reply;
-      setMessages((msgs) => [...msgs, { from: "bot", text: botReply }]);
+      setMessages((msgs) => [...msgs, { from: "bot", text: resp.data.reply }]);
+
+      // Notify patient page to re-fetch medicines/reminders/history after chat actions.
+      window.dispatchEvent(
+        new CustomEvent("caresphere:chat-updated", {
+          detail: {
+            sessionId: sessionId.current,
+            userMessage: currentInput,
+            botReply: resp.data?.reply || "",
+          },
+        })
+      );
     } catch (err) {
       console.error("Chat API error:", err);
       setMessages((msgs) => [
@@ -137,7 +167,15 @@ function ChatWidget() {
                             : "rounded-bl-sm border-2 border-blue-100 bg-white font-normal text-gray-800"
                         }`}
                       >
-                        {m.text}
+                        {m.from === "bot"
+  ? m.text.split("\n").map((line, i) => (
+      <span key={i}>
+        {line}
+        {i < m.text.split("\n").length - 1 && <br />}
+      </span>
+    ))
+  : m.text
+}
                       </div>
                       {m.from === "user" && (
                         <div className="mb-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
