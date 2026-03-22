@@ -3,15 +3,20 @@ import cron from "node-cron";
 import { Medicine } from "../model/medicine.model.js";
 import { Reminder } from "../model/reminderstatus.js";
 
-let reminderCronStarted = false; 
+let reminderCronStarted = false; // Prevent duplicate cron jobs
+
+/**
+ * 🕒 Reminder Creation Cron
+ * TEST MODE: runs every 5 minutes
+ */
 const createRemindersCron = () => {
   if (reminderCronStarted) {
-    console.log(" Reminder creation cron already running, skipping duplicate");
+    console.log("⚠️ Reminder creation cron already running, skipping duplicate");
     return;
   }
 
   cron.schedule("*/5 * * * *", async () => {
-    console.log("Reminder creation cron triggered:", new Date().toLocaleString());
+    console.log("🌙 Reminder creation cron triggered:", new Date().toLocaleString());
 
     try {
       const medicines = await Medicine.find({ active: true });
@@ -23,6 +28,7 @@ const createRemindersCron = () => {
           const reminderTime = new Date();
           reminderTime.setHours(hours, minutes, 0, 0);
 
+          // ⛔ Skip past times
           if (reminderTime <= new Date()) continue;
 
           const startOfDay = new Date(reminderTime);
@@ -33,7 +39,6 @@ const createRemindersCron = () => {
           const exists = await Reminder.findOne({
             medicineId: med._id,
             userId: med.userId,
-            status: { $in: ["pending", "taken"] },
             time: { $gte: startOfDay, $lte: endOfDay },
           });
           if (!exists) {

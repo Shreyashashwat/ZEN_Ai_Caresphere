@@ -2,56 +2,33 @@ import { useEffect } from "react";
 import { onMessage } from "firebase/messaging";
 import { messaging } from "./firebase";
 import { toast } from "react-toastify";
-import axios from "axios";
+import MedicineReminderToast from "../components/MedicineReminderToast";
 
 function Messaging() {
   useEffect(() => {
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground message received:", payload);
+    if (!messaging) return;
 
-      const { title, body } = payload.notification || {};
-      const medicineId = payload.data?.medicineId;
+    // onMessage returns an unsubscribe function
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("✅ [FOREGROUND] FCM message received:", payload);
+
+      const { title, body, medicineId } = payload.data || {};
+      if (!medicineId) return;
 
       toast.info(
-        <div style={{ padding: "10px" }}>
-          <strong>{title || "💊 Medicine Reminder"}</strong>
-          <p>{body || "Time to take your medicine!"}</p>
-          <button
-            onClick={async () => {
-              try {
-                await axios.patch(
-                  `http://localhost:8000/api/v1/medicine/${medicineId}/snooze`,
-                  { minutes: 10 }
-                );
-                toast.dismiss();
-                toast.success("⏰ Snoozed for 10 minutes!");
-              } catch (error) {
-                toast.error("Failed to snooze reminder");
-              }
-            }}
-            style={{
-              background: "#007bff",
-              border: "none",
-              color: "#fff",
-              padding: "6px 12px",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            Snooze 10 min
-          </button>
-        </div>,
-        {
-          autoClose: false,
-          closeOnClick: false,
-        }
+        <MedicineReminderToast
+          title={title || "💊 Medicine Reminder"}
+          body={body || "Time to take your medicine!"}
+          medicineId={medicineId}
+        />,
+        { autoClose: false, closeOnClick: false }
       );
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribe(); // ✅ cleanup on unmount/re-render
+  }, []); // runs once
 
-  return null; // No UI
+  return null;
 }
 
 export default Messaging;

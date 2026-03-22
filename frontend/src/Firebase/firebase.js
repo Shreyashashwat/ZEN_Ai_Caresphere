@@ -1,7 +1,6 @@
-// src/Firebase/firebase.js
+// C:\Users\HP\Desktop\coding\CareSphere\frontend\src\Firebase\firebase.js
 import { initializeApp } from "firebase/app";
 import { getMessaging } from "firebase/messaging";
-
 
 const firebaseConfig = {
   apiKey: "AIzaSyC7POku1ofofXT7jwo1L3Aq0O-0dD-uMUk",
@@ -13,10 +12,7 @@ const firebaseConfig = {
   measurementId: "G-BR5CS7G9WM"
 };
 
-
-
-// Google provider for sign-in
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
 
-export { messaging};
+export { messaging };

@@ -1,3 +1,4 @@
+// public/firebase-messaging-sw.js
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
@@ -29,7 +30,7 @@ messaging.onBackgroundMessage(function(payload) {
     icon: '/logo192.png',
     data, // keep all fields for click actions
     actions: [
-      { action: 'snooze', title: 'Snooze 10 min' }
+      
     ]
   };
 

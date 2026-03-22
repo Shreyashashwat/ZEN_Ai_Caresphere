@@ -13,79 +13,110 @@ const oauth2Client = new google.auth.OAuth2(
   "http://localhost:8000/api/v1/oauth2callback"
 );
 
-// ✅ STEP 1: Redirect user to Google OAuth with JWT token encoded in state
-// STEP 1: Redirect user to Google
+// STEP 1a: Login flow (no token)
 router.get("/auth/google", (req, res) => {
-  try {
-    const { token } = req.query; // JWT token from frontend
-    if (!token) return res.status(400).send("Missing user token.");
-
-    // Verify the token here
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Use JWT itself in "state" for Google OAuth
-    const url = oauth2Client.generateAuthUrl({
-      access_type: "offline",
-      prompt: "consent",      // 👈 forces refresh_token on repeated logins
-      scope: ["https://www.googleapis.com/auth/calendar"],
-      state: token, // carry entire JWT, not just userId
-    });
-
-    res.redirect(url);
-  } catch (err) {
-    console.error("Error generating Google Auth URL:", err);
-    res.status(500).send("Failed to initiate Google OAuth.");
-  }
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: ["profile", "email", "https://www.googleapis.com/auth/calendar"],
+    state: "login"
+  });
+  res.redirect(url);
 });
 
+// STEP 1b: Connect calendar flow (logged-in user passes their token)
+router.get("/auth/google/connect-calendar", (req, res) => {
+  const token = req.query.token; // JWT from localStorage
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: ["profile", "email", "https://www.googleapis.com/auth/calendar"],
+    state: `connect_calendar:${token}` // encode who is connecting
+  });
+  res.redirect(url);
+});
 
-// ✅ STEP 2: Handle Google callback, link tokens to user, redirect to frontend
-// STEP 2: Handle Google callback
+// STEP 2: Single callback handles both
 router.get("/oauth2callback", async (req, res) => {
   const { code, state } = req.query;
-  if (!state) return res.status(401).send("Missing token in state");
-  console.log('/oatuht2222')
 
   try {
-    // Decode JWT passed in 'state'
-    const decoded = jwt.verify(state, process.env.JWT_SECRET);
-    const userId = decoded._id  // ✅ Fix here
-    console.log(userId,"yess got the userr id");
-
-    // Exchange code for access & refresh tokens
     const { tokens } = await oauth2Client.getToken(code);
-    console.log("tokens",tokens);
     oauth2Client.setCredentials(tokens);
 
-    // Save Google tokens to the existing user
-    await User.findByIdAndUpdate(userId, {
+    const oauth2 = google.oauth2("v2");
+    const { data } = await oauth2.userinfo.get({ auth: oauth2Client });
+
+    // ── CONNECT CALENDAR FLOW ──
+    if (state?.startsWith("connect_calendar:")) {
+      const jwtToken = state.replace("connect_calendar:", "");
+      const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
+
+      await User.findByIdAndUpdate(decoded.id || decoded._id, {
+        googleTokens: {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expiry_date: tokens.expiry_date,
+        },
+        hasGoogleAccount: true,
+        googleEmail: data.email,  // save which Gmail was linked
+      });
+
+      // Also save to Calendar model if you use it
+      await Calendar.findOneAndUpdate(
+        { userId: decoded.id || decoded._id },
+        {
+          userId: decoded.id || decoded._id,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiryDate: new Date(tokens.expiry_date),
+        },
+        { upsert: true }
+      );
+
+      return res.redirect(`http://localhost:5173/patient?calendarConnected=true`);
+    }
+
+    // ── LOGIN FLOW ──
+    // Only allow existing users to login (no auto-creation)
+    console.log(`🔍 Checking if user exists with email: ${data.email}`);
+    let user = await User.findOne({ email: data.email });
+    
+    if (!user) {
+      console.log(`❌ No user found with email: ${data.email}`);
+      // User doesn't exist - redirect to login with error
+      return res.redirect(
+        `http://localhost:5173/?error=${encodeURIComponent("Account not found. Please register with your email first.")}`
+      );
+    }
+    
+    console.log(`✅ User found: ${user.username} (${user.email})`);
+
+    // Update existing user with Google tokens
+    await User.findByIdAndUpdate(user._id, {
       googleTokens: {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expiry_date: tokens.expiry_date,
       },
-      hasGoogleAccount: true, // 👈 optional flag to mark connection
+      hasGoogleAccount: true,
+      googleEmail: data.email,
     });
 
-    // Update or create calendar entry linked to the same user
-    await Calendar.findOneAndUpdate(
-      { userId: new mongoose.Types.ObjectId(userId) },
-      {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiryDate: tokens.expiry_date,
-      },
-      { upsert: true, new: true }
+    const jwtToken = jwt.sign(
+      { _id: user._id , role: user.role || "user"},
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
     );
 
-    // ✅ Redirect to frontend
-    res.redirect("http://localhost:5173/patient?connected=google");
+    res.redirect(
+     `http://localhost:5173/google-success?token=${jwtToken}&userId=${user._id}&username=${encodeURIComponent(user.username)}&role=${user.role || "user"}`
+    );
+
   } catch (err) {
-    console.error("OAuth callback error:", err);
-    res.status(401).send("Google Auth failed or invalid token");
+    console.error("Google OAuth error:", err);
+    res.status(401).send("Google authentication failed");
   }
 });
-
-
 
 export default router;

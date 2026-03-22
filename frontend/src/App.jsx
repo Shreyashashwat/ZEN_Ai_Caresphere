@@ -16,33 +16,16 @@ import { messaging } from "./Firebase/firebase";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import MedicineReminderToast from "./components/MedicineReminderToast";
+import GoogleSuccess from "./pages/GoogleSuccess.jsx";
 
 function ChatbotWrapper() {
   const location = useLocation();
   const { user, token } = useContext(UserContext);
 
-  useEffect(() => {
-    if (location.pathname !== "/patient") return;
-
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Foreground FCM message received:", payload);
-
-      // Use data payload from backend (data-only message)
-      const { title, body, medicineId } = payload.data || {};
-
-      if (!medicineId) return; // skip invalid messages
-
-      toast.info(
-        <MedicineReminderToast title={title || "💊 Medicine Reminder"} body={body || ""} medicineId={medicineId} />,
-        { autoClose: false, closeOnClick: false }
-      );
-    });
-
-    return () => unsubscribe();
-  }, [location.pathname]);
-
+ 
   if (location.pathname !== "/patient") return null;
 
+  
   if (!user || !token) {
     return (
       <p className="text-center text-red-500 mt-4">
@@ -56,12 +39,35 @@ function ChatbotWrapper() {
 
 function App() {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/firebase-messaging-sw.js")
-        .then((reg) => console.log("Service Worker registered:", reg))
-        .catch((err) => console.error("SW registration failed:", err));
-    }
+    if (!messaging) return;
+
+    // onMessage returns an unsubscribe function — calling it removes the listener
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("✅ [FOREGROUND] FCM message received:", payload);
+
+      const { title, body, medicineId } = payload.data || {};
+      if (!medicineId) {
+        console.log("⚠️ No medicineId in payload, skipping notification");
+        return;
+      }
+
+      toast.info(
+        <MedicineReminderToast
+          title={title || "💊 Medicine Reminder"}
+          body={body || "Time to take your medicine!"}
+          medicineId={medicineId}
+        />,
+        { autoClose: false, closeOnClick: false }
+      );
+    });
+
+    console.log("✅ [SETUP] Foreground notification listener registered");
+
+    // Cleanup: removes the listener when component unmounts or re-renders (HMR)
+    return () => {
+      unsubscribe();
+      console.log("🧹 [CLEANUP] Foreground notification listener removed");
+    };
   }, []);
 
   return (
@@ -74,13 +80,11 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/patient" element={<Patient />} />
+          <Route path="/doctor" element={<DoctorDashboard />} />
+          <Route path="/google-success" element={<GoogleSuccess />} />
         </Routes>
-<<<<<<< HEAD
-        <ChatbotWrapper /> {/* Foreground notifications with Snooze */}
+        <ChatbotWrapper />
         <ToastContainer position="top-right" />
-=======
-        <ChatbotWrapper /> 
->>>>>>> origin/advance-feature
       </Router>
     </UserProvider>
   );

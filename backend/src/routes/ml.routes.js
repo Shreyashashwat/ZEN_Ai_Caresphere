@@ -1,34 +1,20 @@
+
 import express from "express";
+
 import { trainAdherenceModel } from "../ml/train.js";
-import { predictAdherenceRisk } from "../ml/predict.js";
+import { getUserWeeklyInsights } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
 router.post("/train", async (req, res) => {
   try {
-    const result = await trainAdherenceModel();
-    res.json({ success: true, message: result });
+    await trainAdherenceModel();
+    res.json({ success: true, message: "Model trained successfully" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.post("/predict", async (req, res) => {
-  try {
-    const { hour, dayOfWeek, delay } = req.body;
-
-    const risk = await predictAdherenceRisk(hour, dayOfWeek, delay);
-
-    res.json({
-      success: true,
-      risk
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-});
-
+// In your routes file
+router.get('/weekly-insights/:userId', getUserWeeklyInsights);
 export default router;
