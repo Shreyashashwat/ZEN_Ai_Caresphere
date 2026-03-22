@@ -12,14 +12,8 @@ const reminderStatusSchema = new mongoose.Schema({
   status: { type: String, enum: ["pending", "taken", "missed"], default: "pending" },
   
   userResponseTime: { type: Date },
-<<<<<<< HEAD
   eventId: { type: String },
   autoAdjusted: { type: Boolean, default: false },
   processedMissed: { type: Boolean, default: false },
 }, { timestamps: true });
-=======
-   eventId: { type: String },
-  autoAdjusted: { type: Boolean, default: false },
-});
->>>>>>> doctor
 export const Reminder=mongoose.model("Reminder",reminderStatusSchema)

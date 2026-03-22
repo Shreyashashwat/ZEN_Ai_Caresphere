@@ -31,10 +31,16 @@ const createRemindersCron = () => {
           // ⛔ Skip past times
           if (reminderTime <= new Date()) continue;
 
+          const startOfDay = new Date(reminderTime);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(reminderTime);
+          endOfDay.setHours(23, 59, 59, 999);
+
           const exists = await Reminder.findOne({
             medicineId: med._id,
             userId: med.userId,
-            time: reminderTime,
+            status: { $in: ["pending", "taken"] },
+            time: { $gte: startOfDay, $lte: endOfDay },
           });
           if (!exists) {
             await Reminder.create({
