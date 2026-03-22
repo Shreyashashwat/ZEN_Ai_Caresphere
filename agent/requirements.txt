@@ -1,0 +1,18 @@
+# Web framework
+fastapi==0.110.0
+uvicorn==0.29.0
+
+# Core utilities
+pydantic>=2.7.4,<3.0.0
+python-dotenv==1.0.1
+requests==2.31.0
+
+# LangChain ecosystem (PINNED — VERY IMPORTANT)
+langchain==0.2.16
+langchain-core==0.2.38
+langchain-community==0.2.16
+langchain-openai==0.1.23
+langsmith==0.1.98
+
+
+redis==5.0.3
