@@ -33,7 +33,7 @@ export const getWebsiteGoogleEvents = async (req, res) => {
       expiry_date: new Date(calendarData.expiryDate).getTime(),
     });
 
-    // 🔁 Update DB when Google issues new tokens
+
     auth.on('tokens', async (tokens) => {
       if (tokens.refresh_token || tokens.access_token) {
         await Calendar.findOneAndUpdate(
@@ -73,7 +73,7 @@ export const getWebsiteGoogleEvents = async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch website events:", error.message);
     
-    // If token is invalid/expired and can't be refreshed
+
     if (error.message.includes("invalid_grant") || error.message.includes("Invalid Credentials")) {
       return res.status(401).json({ message: "Google Calendar access expired. Please reconnect." });
     }
