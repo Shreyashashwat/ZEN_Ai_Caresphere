@@ -39,7 +39,6 @@ const createRemindersCron = () => {
           const exists = await Reminder.findOne({
             medicineId: med._id,
             userId: med.userId,
-            status: { $in: ["pending", "taken"] },
             time: { $gte: startOfDay, $lte: endOfDay },
           });
           if (!exists) {

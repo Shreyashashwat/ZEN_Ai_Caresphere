@@ -66,4 +66,5 @@ export const createAppointment = (data) => API.post(`/doctor-request/createAppoi
 export const getDoctorAppointments = () => API.get(`/doctor-request/getappointments`);
 export const updateAppointmentStatus = (appointmentId, status) => 
   API.post(`/doctor-request/appointments/${appointmentId}`, { status });
+
 export default API;

@@ -71,7 +71,7 @@ const DoctorDashboard = () => {
   );
 
   const filteredApts = appointments.filter((apt) =>
-    apt.patientId?.username?.toLowerCase().includes(searchApt.toLowerCase())
+    apt.patientId?.username?.toLowerCase()?.includes(searchApt.toLowerCase()) ?? true
   );
 
   const handleAcceptRequest = async (requestId) => {
@@ -301,7 +301,7 @@ const DoctorDashboard = () => {
               <p className="text-center text-gray-400 py-10 italic">No appointments scheduled.</p>
             ) : (
               filteredApts.map((apt) => (
-                <div key={apt._id} className={`flex flex-col md:flex-row md:items-center justify-between p-6 rounded-2xl border ${apt.status === 'COMPLETED' ? 'bg-gray-50 opacity-60' : 'bg-indigo-50/30 border-indigo-100'}`}>
+                <div key={apt._id} className={`flex flex-col md:flex-row md:items-center justify-between p-6 rounded-2xl border ${apt.status === 'COMPLETED' || apt.status === 'CANCELLED' ? 'bg-gray-50 opacity-60' : 'bg-indigo-50/30 border-indigo-100'}`}>
                   <div>
                     <h4 className="font-bold text-indigo-700">{apt.patientId?.username}</h4>
                     <p className="text-xs font-semibold text-gray-500">{new Date(apt.appointmentDate).toLocaleString()}</p>
@@ -314,7 +314,7 @@ const DoctorDashboard = () => {
                     {apt.status === 'SCHEDULED' && (
                       <button onClick={() => handleUpdateAptStatus(apt._id, 'COMPLETED')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold">Mark Done</button>
                     )}
-                    {(apt.status === 'PENDING' || apt.status === 'SCHEDULED') && (
+                    {apt.status !== 'COMPLETED' && (
                       <button onClick={() => handleUpdateAptStatus(apt._id, 'CANCELLED')} className="px-4 py-2 bg-white border border-red-200 text-red-500 rounded-lg text-xs font-bold">Cancel</button>
                     )}
                     <span className="ml-2 px-3 py-2 bg-white rounded-lg text-[10px] font-black border uppercase tracking-widest">{apt.status}</span>
