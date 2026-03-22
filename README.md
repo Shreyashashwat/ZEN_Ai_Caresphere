@@ -1,7 +1,7 @@
-# Zen AI - AI-Powered Healthcare Management Platform
-🏆 Built for Hackathon Excellence
+# CareSphere - AI-Powered Healthcare Management Platform
+🏆 Built for Zen AI Hackathon
 
-Zen AI is a comprehensive, AI-driven healthcare management platform that revolutionizes medication adherence and patient care through intelligent automation, predictive analytics, caregiver coordination, doctor-patient integration, and seamless Google Calendar sync.
+CareSphere is a comprehensive, AI-driven healthcare management platform that revolutionizes medication adherence and patient care through intelligent automation, predictive analytics, caregiver coordination, doctor-patient integration, and seamless Google Calendar sync.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -14,7 +14,7 @@ Zen AI is a comprehensive, AI-driven healthcare management platform that revolut
 ---
 
 ## Overview
-Zen AI helps users set up personalized medication schedules and ensures timely intake through intelligent reminders, visual tracking dashboards, and AI-generated weekly health insights. Advanced AI features enhance user engagement by learning patterns, providing proactive suggestions, and connecting caregivers with patients in real-time.
+CareSphere helps users set up personalized medication schedules and ensures timely intake through intelligent reminders, visual tracking dashboards, and AI-generated weekly health insights. Advanced AI features enhance user engagement by learning patterns, providing proactive suggestions, and connecting caregivers with patients in real-time.
 
 ---
 
@@ -95,10 +95,10 @@ Zen AI helps users set up personalized medication schedules and ensures timely i
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/Zen_Ai.git
+git clone https://github.com/your-username/CareSphere.git
 
 # Move into project directory
-cd Zen_Ai
+cd CareSphere
 ```
 
 There are **5 major components** to start:
@@ -228,7 +228,7 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ## Folder Structure
 
 ```
-Zen_Ai/
+CareSphere/
 │
 ├── agent/                          # Python-based LangChain AI agent system
 │   ├── guardrails/                 # Input & output safety validation for LLM
@@ -305,7 +305,7 @@ Zen_Ai/
 │   ├── package.json
 │   └── package-lock.json
 │
-├── llm-services/                   # FastAPI microservice for weekly AI insights
+├── llm-services/                   # FastAPI microservice for AI/LLM weekly insights
 │   ├── main.py                     # Google Gemini + LangChain insight generation (port 8001)
 │   ├── test.py
 │   └── requirement.txt
@@ -317,22 +317,24 @@ Zen_Ai/
 
 ---
 
+
+
 ## 🚀 Future Roadmap
 
-### Phase 2: Advanced Features
-- 🔊 Voice-activated medication reminders
-- 📱 Mobile app with offline capabilities
-- 🏥 Hospital EHR system integration
-- 🌐 Multi-language support and localization
+### Phase 2: Mobile & Accessibility
+- 📱 Progressive Web App (PWA) support for a mobile-friendly, installable experience
+- 🌐 Multi-language support starting with Hindi and regional Indian languages
+- 🔊 Voice-based reminder confirmations — confirm a dose taken via mic input
+- ♿ Accessibility improvements for elderly users (larger text, high contrast mode)
 
-### Phase 3: Enterprise Features
-- 🏢 Healthcare institution admin dashboards
-- 📊 Population health analytics
-- 💊 Pharmacy integration and prescription sync
-- 🔬 Clinical trial participation matching
+### Phase 3: Smarter Health Tracking
+- 📈 Monthly and yearly adherence trend reports with exportable PDF summaries
+- 🩺 Vitals logging — let users optionally log blood pressure, sugar levels alongside medications
+- 🏆 Streak-based gamification — reward consistent adherence with badges and milestones
+- 📋 Shareable health summary reports for doctor appointments
 
-### Phase 4: Global Scale
-- ☁️ Multi-cloud deployment strategy
-- 🌍 International regulatory compliance
-- 🤝 Third-party healthcare app integrations
-- 🧬 Personalized medicine recommendations
+### Phase 4: Platform Expansion
+- ☁️ Full cloud deployment (frontend on Vercel, backend on Render/Railway)
+- 🧪 Unit and integration tests for core backend routes and agent tools
+- 🔐 Refresh token support and secure session management
+- 🏥 Basic pharmacy tie-in — link a prescription and get low-stock alerts before you run out
