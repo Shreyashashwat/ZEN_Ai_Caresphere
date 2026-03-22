@@ -1,67 +1,74 @@
 import 'dotenv/config';
-import { InferenceClient } from "@huggingface/inference";
-import { Medicine } from "../model/medicine.model.js";
+import axios from 'axios';
+import { User } from '../model/user.model.js';
+import { Medicine } from '../model/medicine.model.js';
 
-const fetchHistory = async (userId) => {
-  const medicines = await Medicine.find({ userId }).populate("statusHistory");
-
-  const history = medicines.flatMap((med) =>
-    med.statusHistory.map((status) => ({
-      medicineName: med.medicineName,
-      dosage: med.dosage,
-      frequency: med.frequency,
-      time: status.time,
-      status: status.status,
-      userResponseTime: status.userResponseTime,
-    }))
-  );
-
-
-  history.sort((a, b) => new Date(b.time) - new Date(a.time));
-  console.log(history);
-  return history;
-};
-
+const AGENT_URL = process.env.PYTHON_AGENT_URL || "http://localhost:8002";
 
 export const chatbot = async (req, res) => {
   try {
-    const hfApiToken = process.env.HUGGINGFACEHUB_API_TOKEN;
-    if (!hfApiToken) {
-      console.error("HUGGINGFACEHUB_API_TOKEN is not defined");
-      return res.status(500).json({ error: "Chatbot service unavailable (Configuration Error)" });
-    }
-    const client = new InferenceClient(hfApiToken);
+    const { userId, message, sessionId } = req.body;
 
-    const { userId, message } = req.body;
-
-    // Use req.user set by verifyJwt middleware
-    if (req.user.toString() !== userId.toString()) {
+    const loggedInUserId = req.user._id || req.user.id;
+    if (!loggedInUserId || loggedInUserId.toString() !== userId.toString()) {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
+    if (!message?.trim()) return res.status(400).json({ error: "Message is required" });
+    if (!sessionId)        return res.status(400).json({ error: "sessionId is required" });
 
-    const userData = await fetchHistory(userId);
-    const contextString = userData.length
-      ? `Medicine history: ${JSON.stringify(userData)}`
-      : "No medication data found.";
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token found" });
 
-    const messages = [
-      { role: "system", content: `You are a medical assistant chatbot. Use the following user data to answer: ${contextString}` },
-      { role: "user", content: message },
-    ];
+    // ── Fetch user context (name, age, gender + active medicines) ────────────
+    const [user, medicines] = await Promise.all([
+      User.findById(loggedInUserId).select("username age gender"),
+      Medicine.find({ userId: loggedInUserId }).select("medicineName  dosage frequency").lean(),
+    ]);
 
-    const response = await client.chatCompletion({
-      model: "mistralai/Mistral-7B-Instruct-v0.2",
-      messages,
-      max_tokens: 512,
-      temperature: 0.7,
+    const userContext = {
+      name:      user?.username  || "the user",
+      age:       user?.age       || null,
+      gender:    user?.gender    || null,
+      medicines: medicines.map(m => ({
+      name:      m.medicineName,   // ← fixed
+
+        dosage:    m.dosage,
+        frequency: m.frequency,
+      })),
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const agentResponse = await axios.post(
+      `${AGENT_URL}/chat`,
+      { userId, message, token, sessionId, userContext },
+      { timeout: 90000 }
+    );
+
+    return res.json({
+      reply:     agentResponse.data.reply,
+      sessionId: agentResponse.data.sessionId,
     });
 
-    const reply = response.choices?.[0]?.message?.content ?? "";
-    return res.json({ reply });
-
   } catch (err) {
-    console.error("Error in /chatbot:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Agent call failed:", err?.response?.data || err.message);
+    const isTimeout  = err?.code === "ECONNABORTED" || err?.message?.includes("timeout");
+    const statusCode = err?.response?.status || (isTimeout ? 504 : 500);
+    const msg =
+      statusCode === 503 ? "The AI assistant is currently unavailable. Please try again shortly."
+      : isTimeout        ? "The request took too long. Please try again."
+      :                    "Something went wrong. Please try again.";
+    return res.status(statusCode).json({ error: msg });
+  }
+};
+
+export const clearChatSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    await axios.delete(`${AGENT_URL}/chat/${sessionId}`, { timeout: 5000 });
+    return res.json({ status: "cleared" });
+  } catch (err) {
+    console.error("Clear session failed:", err.message);
+    return res.status(500).json({ error: "Failed to clear session" });
   }
 };
