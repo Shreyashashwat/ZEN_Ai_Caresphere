@@ -43,7 +43,7 @@ CareSphere helps users set up personalized medication schedules and ensures time
   - Input & output guardrails for safe, medically responsible responses.
 
 - **Weekly AI Health Insights (LLM Service):**
-  - Powered by Google Gemini via LangChain.
+  - Powered by Groq SDK.
   - Generates personalized, actionable health insights based on weekly adherence summaries.
 
 - **Caregiver Module:**
@@ -71,7 +71,7 @@ CareSphere helps users set up personalized medication schedules and ensures time
 | Integration | Google Calendar API, Google OAuth2 |
 | Authentication | JWT-based Auth, bcrypt |
 | AI Agent | LangChain, OpenAI GPT-4o-mini (FastAPI, port 8002) |
-| LLM Service | LangChain Google Gemini (FastAPI, port 8001) |
+| LLM Service | Groq SDK |
 | ML | HuggingFace Inference API |
 | DevOps | Docker (Redis via docker-compose) |
 
@@ -87,7 +87,7 @@ CareSphere helps users set up personalized medication schedules and ensures time
 - Redis (via Docker recommended — see step 1)
 - Firebase project setup for notifications
 - OpenAI API key for the agent chatbot
-- Google API key for the LLM insights service
+- Groq API key for the LLM insights service
 
 ---
 
@@ -204,27 +204,6 @@ uvicorn agent.main:app --host 0.0.0.0 --port 8002 --reload
 
 ---
 
-#### 5. LLM SERVICE
-```bash
-# Move into llm-services folder
-cd llm-services
-
-# Install dependencies
-pip install -r requirement.txt
-```
-
-Create a `.env` file in the `llm-services/` folder and add:
-```env
-GOOGLE_API_KEY=your_google_api_key
-```
-
-```bash
-# Start the LLM service
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-```
-
----
-
 ## Folder Structure
 
 ```
@@ -304,11 +283,6 @@ CareSphere/
 │   ├── tailwind.config.js
 │   ├── package.json
 │   └── package-lock.json
-│
-├── llm-services/                   # FastAPI microservice for AI/LLM weekly insights
-│   ├── main.py                     # Google Gemini + LangChain insight generation (port 8001)
-│   ├── test.py
-│   └── requirement.txt
 │
 ├── docker-compose.yml              # Redis Docker setup
 ├── .gitignore
