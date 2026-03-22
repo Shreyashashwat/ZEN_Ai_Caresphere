@@ -1,7 +1,7 @@
 import cron from "node-cron";
 
-import { addReminder } from "../controllers/reminder.controller.js";
 import { Medicine } from "../model/medicine.model.js";
+import { Reminder } from "../model/reminderstatus.js";
 
 let reminderCronStarted = false; // Prevent duplicate cron jobs
 
@@ -31,10 +31,20 @@ const createRemindersCron = () => {
           // ⛔ Skip past times
           if (reminderTime <= new Date()) continue;
 
-          await addReminder({
+          const exists = await Reminder.findOne({
             medicineId: med._id,
+            userId: med.userId,
             time: reminderTime,
           });
+          if (!exists) {
+            await Reminder.create({
+              medicineId: med._id,
+              userId: med.userId,
+              time: reminderTime,
+              status: "pending",
+              eventId: null,
+            });
+          }
         }
       }
     } catch (err) {
